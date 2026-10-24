@@ -193,13 +193,17 @@ def add_general_handler(target, ref):
 def static_tests(root):
     js = [ST_JS, HH_JS]
     for name in js:
-        proc = subprocess.run(["node", "--check", str(root/name)], capture_output=True)
+        text, _, _, _ = read_target(root/name)
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".js", encoding="utf-8") as tmp:
+            tmp.write(text)
+            tmp.flush()
+            proc = subprocess.run(["node", "--check", tmp.name], capture_output=True)
         if proc.returncode:
             raise RuntimeError("JavaScript parse failed: " + name)
-    st = (root/ST_HANDLER).read_bytes().decode("utf-8-sig", errors="replace")
-    hh = (root/HH_HANDLER).read_bytes().decode("utf-8-sig", errors="replace")
-    js_st = (root/ST_JS).read_bytes().decode("utf-8-sig", errors="replace")
-    js_hh = (root/HH_JS).read_bytes().decode("utf-8-sig", errors="replace")
+    st = read_target(root/ST_HANDLER)[0]
+    hh = read_target(root/HH_HANDLER)[0]
+    js_st = read_target(root/ST_JS)[0]
+    js_hh = read_target(root/HH_JS)[0]
     requirements = [
         (st.count('case "CA01ExportHHVG_MD00DSHangHoaSOANTHAO"')==1, "ST route"),
         (st.count("private List<string> GetExportProductIds(")==1, "ST scoped export filter"),
