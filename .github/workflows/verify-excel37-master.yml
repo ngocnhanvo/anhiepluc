@@ -1,0 +1,31 @@
+name: AnHiepLuc - verify 37-column production master
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: read
+  issues: read
+jobs:
+  verify:
+    if: >-
+      ${{ github.event.issue.user.login == 'ngocnhanvo' &&
+          github.event.sender.login == 'ngocnhanvo' &&
+          github.event.issue.title == '[anhiepluc:verify-excel37-master]' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Read back Azure master; verify both handlers
+        env:
+          AZURE_DEVOPS_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}
+          EXPORT_MODE: preview
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/apply_anhiepluc_export_37_columns.py | tee "$RUNNER_TEMP/excel37_verify.txt"
+          grep -Fq 'AZURE_BASE_SHA=5a9ed179ae95e2e5139297b5e4899a3d89e835d3' "$RUNNER_TEMP/excel37_verify.txt"
+          grep -Fq 'VALIDATION=PASS; MODULES=SOANTHAO,DHD; HEADER_COUNT=37; WORKSHOP_TEAM=CORRECT' "$RUNNER_TEMP/excel37_verify.txt"
+          grep -Fq 'CHANGED_FILES=0' "$RUNNER_TEMP/excel37_verify.txt"
+          echo 'PRODUCTION_MASTER_STATIC_VERIFIED=PASS'
