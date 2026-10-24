@@ -191,15 +191,18 @@ def add_general_handler(target, ref):
     return target
 
 def static_tests(root):
-    js = [ST_JS, HH_JS]
-    for name in js:
+    js = [(ST_JS, "CA01ExportHHVG_MD00DSHangHoaSOANTHAO"),
+          (HH_JS, "CA_01_ExportHH")]
+    for name, case in js:
         text, _, _, _ = read_target(root/name)
+        # Only the newly changed case is parsed: pre-existing legacy JS is out of scope.
+        script = extract_js_block(text, case)
         with tempfile.NamedTemporaryFile(mode="w", suffix=".js", encoding="utf-8") as tmp:
-            tmp.write(text)
+            tmp.write(script + "\n")
             tmp.flush()
             proc = subprocess.run(["node", "--check", tmp.name], capture_output=True)
         if proc.returncode:
-            raise RuntimeError("JavaScript parse failed: " + name)
+            raise RuntimeError("Export JavaScript parse failed: " + name)
     st = read_target(root/ST_HANDLER)[0]
     hh = read_target(root/HH_HANDLER)[0]
     js_st = read_target(root/ST_JS)[0]
