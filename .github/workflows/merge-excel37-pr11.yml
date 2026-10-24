@@ -1,0 +1,85 @@
+name: AnHiepLuc - merge verified product Excel PR 11
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: read
+  issues: read
+jobs:
+  merge:
+    if: >-
+      ${{ github.event.issue.user.login == 'ngocnhanvo' &&
+          github.event.sender.login == 'ngocnhanvo' &&
+          github.event.issue.title == '[anhiepluc:merge-excel37-pr11]' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Merge exact Azure code PR with no bypass and verify master
+        shell: python
+        env:
+          AZURE_DEVOPS_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}
+        run: |
+          import os,base64,urllib.request,urllib.error,json,time
+          pat=os.environ.get("AZURE_DEVOPS_PAT","")
+          if not pat: raise RuntimeError("AZURE_PAT_MISSING")
+          base="https://dev.azure.com/vongocnhancd10cntt2/AnHiepLuc/_apis/git/repositories/AnHiepLuc"
+          auth="Basic "+base64.b64encode((":"+pat).encode()).decode()
+          def api(path,method="GET",body=None):
+              data=None if body is None else json.dumps(body).encode()
+              hdr={"Authorization":auth,"Accept":"application/json"}
+              if data is not None: hdr["Content-Type"]="application/json"
+              req=urllib.request.Request(base+path,method=method,data=data,headers=hdr)
+              try:
+                  with urllib.request.urlopen(req,timeout=45) as response: return json.load(response)
+              except urllib.error.HTTPError as err:
+                  raise RuntimeError("AZURE_API_HTTP_"+str(err.code)) from None
+          expected_source="f990409d490961ab153254f4685f2614168fc144"
+          expected_master="fd0e27c51e829c4dc62dbf691400f739cc4f9da8"
+          expected_branch="refs/heads/ai/anhiepluc-excel-37-cot-xuong-to-20261025"
+          path="/pullRequests/11?api-version=7.1"
+          def master_sha():
+              items=api("/refs?filter=heads/master&api-version=7.1").get("value",[])
+              return next((x.get("objectId") for x in items if x.get("name")=="refs/heads/master"),None)
+          pr=api(path)
+          if pr.get("status")=="completed":
+              print("PR_ALREADY_COMPLETED=YES")
+              print("AZURE_MASTER_SHA="+str(master_sha()))
+              print("PR_MERGE_SHA="+str((pr.get("lastMergeCommit") or {}).get("commitId")))
+              raise SystemExit(0)
+          if pr.get("status")!="active": raise RuntimeError("PR_NOT_ACTIVE")
+          if pr.get("isDraft"): raise RuntimeError("PR_IS_DRAFT")
+          if pr.get("sourceRefName")!=expected_branch: raise RuntimeError("WRONG_SOURCE_BRANCH")
+          if pr.get("targetRefName")!="refs/heads/master": raise RuntimeError("WRONG_DESTINATION")
+          if (pr.get("lastMergeSourceCommit") or {}).get("commitId")!=expected_source:
+              raise RuntimeError("PR_SOURCE_SHA_CHANGED")
+          current=master_sha()
+          if current!=expected_master: raise RuntimeError("MASTER_SHA_CHANGED_ABORT")
+          for i in range(12):
+              if pr.get("mergeStatus")=="succeeded": break
+              if pr.get("mergeStatus") in ("conflicts","failure","rejectedByPolicy"):
+                  raise RuntimeError("MERGE_POLICY_OR_CONFLICT_BLOCKED")
+              time.sleep(3)
+              pr=api(path)
+          if pr.get("mergeStatus")!="succeeded": raise RuntimeError("MERGE_NOT_READY")
+          print("MERGE_REQUEST=READY; SOURCE="+expected_source+"; MASTER="+current)
+          api(path,"PATCH",{
+              "status":"completed",
+              "lastMergeSourceCommit":{"commitId":expected_source},
+              "completionOptions":{"mergeStrategy":"noFastForward",
+                                   "deleteSourceBranch":False,
+                                   "bypassPolicy":False}
+          })
+          for i in range(20):
+              pr=api(path)
+              sha=master_sha()
+              if pr.get("status")=="completed" and sha and sha!=expected_master:
+                  merge_sha=(pr.get("lastMergeCommit") or {}).get("commitId")
+                  if merge_sha!=sha: raise RuntimeError("MERGE_SHA_MISMATCH")
+                  print("MERGE_VERIFIED=PASS")
+                  print("PR_STATUS=completed")
+                  print("AZURE_MASTER_SHA="+sha)
+                  print("PR_MERGE_SHA="+merge_sha)
+                  break
+              time.sleep(4)
+          else:
+              raise RuntimeError("MERGE_COMPLETION_NOT_VERIFIED")
