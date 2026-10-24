@@ -1,0 +1,38 @@
+name: AnHiepLuc - implement production Excel 37 columns
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        required: true
+        type: choice
+        default: preview
+        options:
+          - preview
+          - apply
+  issues:
+    types: [opened]
+permissions:
+  contents: read
+  issues: read
+concurrency:
+  group: anhiepluc-production-excel-37
+  cancel-in-progress: false
+jobs:
+  patch:
+    if: >-
+      ${{ github.event_name == 'workflow_dispatch' ||
+          (github.event.issue.user.login == 'ngocnhanvo' &&
+           github.event.sender.login == 'ngocnhanvo' &&
+           (github.event.issue.title == '[anhiepluc:excel37-preview]' ||
+            github.event.issue.title == '[anhiepluc:excel37-apply]')) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Correct two Excel export handlers in Azure clone only
+        env:
+          AZURE_DEVOPS_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}
+          EXPORT_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.mode || (github.event.issue.title == '[anhiepluc:excel37-apply]' && 'apply' || 'preview') }}
+        run: python3 scripts/apply_anhiepluc_export_37_columns.py
