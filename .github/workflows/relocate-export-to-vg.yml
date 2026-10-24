@@ -1,0 +1,37 @@
+name: AnHiepLuc - relocate Excel export to DSHangHoaVG
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        type: choice
+        description: Preview or create PR on Azure DevOps
+        options: [preview, apply]
+        default: preview
+        required: true
+  issues:
+    types: [opened]
+permissions:
+  contents: read
+  issues: read
+concurrency:
+  group: anhiepluc-relocate-excel-export
+  cancel-in-progress: false
+jobs:
+  relocate:
+    if: >-
+      ${{ github.event_name == 'workflow_dispatch' ||
+          (github.event.issue.user.login == 'ngocnhanvo' &&
+           github.event.sender.login == 'ngocnhanvo' &&
+           (github.event.issue.title == '[anhiepluc:relocate-export-preview]' ||
+            github.event.issue.title == '[anhiepluc:relocate-export-apply]')) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Restore original general export and port DHD Excel case on Azure only
+        env:
+          AZURE_DEVOPS_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}
+          RELOCATE_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.mode || (github.event.issue.title == '[anhiepluc:relocate-export-apply]' && 'apply' || 'preview') }}
+        run: python3 scripts/relocate_export_to_vg.py
