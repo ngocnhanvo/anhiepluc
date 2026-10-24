@@ -1,0 +1,57 @@
+name: AnHiepLuc - Azure PR 8 status
+on:
+  workflow_dispatch:
+  issues:
+    types: [opened]
+permissions:
+  contents: read
+  issues: read
+jobs:
+  status:
+    if: >-
+      ${{ github.event_name == 'workflow_dispatch' ||
+          (github.event.issue.user.login == 'ngocnhanvo' &&
+           github.event.sender.login == 'ngocnhanvo' &&
+           github.event.issue.title == '[anhiepluc:pr8-status]') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Check Azure PR and master without exposing source or tokens
+        shell: python
+        env:
+          AZURE_DEVOPS_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}
+        run: |
+          import base64, json, os, urllib.request, urllib.error
+          pat=os.getenv("AZURE_DEVOPS_PAT","")
+          if not pat: raise RuntimeError("AZURE_PAT_MISSING")
+          headers={"Authorization":"Basic "+base64.b64encode((":"+pat).encode()).decode(),"Accept":"application/json"}
+          base="https://dev.azure.com/vongocnhancd10cntt2/AnHiepLuc/_apis/git/repositories/AnHiepLuc"
+          def api(path):
+              req=urllib.request.Request(base+path,headers=headers)
+              with urllib.request.urlopen(req,timeout=40) as f:
+                  return json.load(f)
+          try:
+              pr=api("/pullRequests/8?api-version=7.1")
+              print("PR_ID="+str(pr.get("pullRequestId")))
+              print("PR_STATUS="+str(pr.get("status")))
+              print("PR_SOURCE="+str(pr.get("sourceRefName")))
+              print("PR_TARGET="+str(pr.get("targetRefName")))
+              print("PR_LAST_SOURCE_SHA="+str((pr.get("lastMergeSourceCommit") or {}).get("commitId")))
+              print("PR_LAST_TARGET_SHA="+str((pr.get("lastMergeTargetCommit") or {}).get("commitId")))
+              print("PR_MERGE_SHA="+str((pr.get("lastMergeCommit") or {}).get("commitId")))
+              print("PR_MERGE_STATUS="+str(pr.get("mergeStatus")))
+              print("PR_IS_DRAFT="+str(pr.get("isDraft")))
+              print("PR_VOTE_SUMMARY="+str([(x.get("vote"), x.get("isRequired")) for x in pr.get("reviewers",[])]))
+              refs=api("/refs?filter=heads/master&api-version=7.1").get("value",[])
+              for r in refs:
+                  if r.get("name")=="refs/heads/master":
+                      print("MASTER_HEAD_SHA="+str(r.get("objectId")))
+              statuses=api("/pullRequests/8/statuses?api-version=7.1").get("value",[])
+              print("PR_POLICY_STATUSES="+json.dumps([{"state":x.get("state"),"context":(x.get("context") or {}).get("name")} for x in statuses],ensure_ascii=True))
+              try:
+                  threads=api("/pullRequests/8/threads?api-version=7.1").get("value",[])
+                  print("PR_THREADS="+str(len(threads)))
+              except urllib.error.HTTPError as e:
+                  print("PR_THREADS_UNAVAILABLE="+str(e.code))
+          except urllib.error.HTTPError as e:
+              raise RuntimeError("AZURE_API_HTTP_"+str(e.code)) from None
