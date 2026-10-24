@@ -1,0 +1,84 @@
+name: AnHiepLuc - controlled merge Azure PR 9
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: read
+  issues: read
+jobs:
+  merge:
+    if: >-
+      ${{ github.event.issue.user.login == 'ngocnhanvo' &&
+          github.event.sender.login == 'ngocnhanvo' &&
+          github.event.issue.title == '[anhiepluc:merge-pr9-to-master]' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Merge exact reviewed Azure PR without bypassing policies
+        shell: python
+        env:
+          AZURE_DEVOPS_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}
+        run: |
+          import base64, json, os, urllib.request, urllib.error, time
+          pat=os.getenv("AZURE_DEVOPS_PAT","")
+          if not pat: raise RuntimeError("AZURE_PAT_MISSING")
+          hdr={"Authorization":"Basic "+base64.b64encode((":"+pat).encode()).decode(),"Accept":"application/json"}
+          base="https://dev.azure.com/vongocnhancd10cntt2/AnHiepLuc/_apis/git/repositories/AnHiepLuc"
+          expected_source="28f0efd15d930e63065d2ba892f0b6169ae4eadb"
+          expected_master="0990610afcc5ef6a1ff385def023f4bebecc8c6a"
+          def api(path, method="GET", data=None):
+              headers=dict(hdr)
+              payload=None if data is None else json.dumps(data).encode("utf-8")
+              if payload is not None: headers["Content-Type"]="application/json"
+              req=urllib.request.Request(base+path,method=method,headers=headers,data=payload)
+              try:
+                  with urllib.request.urlopen(req,timeout=45) as f: return json.load(f)
+              except urllib.error.HTTPError as e:
+                  raise RuntimeError("AZURE_API_HTTP_"+str(e.code)) from None
+          pr=api("/pullRequests/9?api-version=7.1")
+          if pr.get("status")=="completed":
+              print("PR_STATUS=ALREADY_COMPLETED")
+              refs=api("/refs?filter=heads/master&api-version=7.1").get("value",[])
+              head=next((x.get("objectId") for x in refs if x.get("name")=="refs/heads/master"),None)
+              print("MASTER_HEAD_SHA="+str(head))
+              exit(0)
+          if pr.get("status")!="active": raise RuntimeError("PR_NOT_ACTIVE")
+          if pr.get("sourceRefName")!="refs/heads/ai/relocate-excel-export-to-vg-20261024": raise RuntimeError("PR_SOURCE_CHANGED")
+          if pr.get("targetRefName")!="refs/heads/master": raise RuntimeError("PR_TARGET_CHANGED")
+          if (pr.get("lastMergeSourceCommit") or {}).get("commitId")!=expected_source:
+              raise RuntimeError("SOURCE_SHA_CHANGED")
+          for attempt in range(12):
+              if pr.get("mergeStatus")=="succeeded": break
+              if pr.get("mergeStatus") in ("conflicts","rejectedByPolicy","failure"):
+                  raise RuntimeError("AZURE_MERGE_STATUS_BLOCKED")
+              time.sleep(3)
+              pr=api("/pullRequests/9?api-version=7.1")
+          if pr.get("mergeStatus")!="succeeded": raise RuntimeError("AZURE_MERGE_STATUS_NOT_READY")
+          if pr.get("isDraft"): raise RuntimeError("PR_STILL_DRAFT")
+          refs=api("/refs?filter=heads/master&api-version=7.1").get("value",[])
+          master=next((x.get("objectId") for x in refs if x.get("name")=="refs/heads/master"),None)
+          if master!=expected_master: raise RuntimeError("MASTER_CHANGED_ABORT")
+          result=api("/pullRequests/9?api-version=7.1","PATCH",{
+              "status":"completed",
+              "lastMergeSourceCommit":{"commitId":expected_source},
+              "completionOptions":{
+                  "mergeStrategy":"noFastForward",
+                  "deleteSourceBranch":False,
+                  "bypassPolicy":False,
+                  "bypassReason":None
+              }
+          })
+          print("AZURE_PR_STATUS_AFTER_PATCH="+str(result.get("status")))
+          for attempt in range(12):
+              verified=api("/pullRequests/9?api-version=7.1")
+              head_refs=api("/refs?filter=heads/master&api-version=7.1").get("value",[])
+              head=next((x.get("objectId") for x in head_refs if x.get("name")=="refs/heads/master"),None)
+              if verified.get("status")=="completed" and head and head!=expected_master:
+                  break
+              time.sleep(5)
+          print("AZURE_PR_STATUS_VERIFIED="+str(verified.get("status")))
+          print("MASTER_HEAD_SHA="+str(head))
+          print("MERGE_COMMIT="+str((verified.get("lastMergeCommit") or {}).get("commitId")))
+          if verified.get("status")!="completed" or not head or head==expected_master:
+              raise RuntimeError("MERGE_NOT_YET_VERIFIED")
+          print("MERGE_VERIFIED=PASS")
