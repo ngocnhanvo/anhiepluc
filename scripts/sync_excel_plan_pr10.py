@@ -52,7 +52,7 @@ def validate_plan(text):
         if not any(col in x for x in lines): raise RuntimeError("PLAN_TAIL_MAPPING_WRONG")
     if not all(term in text for term in ("md_phanxuong.ten_phanxuong",
         "md_phanxuong_to.ten_to", "sp.md_phanxuong_id","sp.md_to_id",
-        "LOẠI BỎ", "37 cột")):
+        "Bỏ hẳn 4 cột ẩn", "37 cột")):
         raise RuntimeError("PLAN_MISSING_OWNER_DECISIONS")
     for name in ("vd","vn","vl","ghichu_vachngan","Mã thô"):
         if any(re.search(r"^\| [A-Z]{1,2} \| "+re.escape(name)+r" \|",x) for x in lines):
