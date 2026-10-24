@@ -227,7 +227,7 @@ def main():
             print("RESULT=PREVIEW_PASS; AZURE_UNCHANGED=YES")
             return
         # Fail safely if a same-named branch exists, rather than rewriting it.
-        if git(["ls-remote","--heads","origin",BRANCH],cwd=root,env=env):
+        if git(["--config-env=http.extraheader=AZURE_GIT_HEADER","ls-remote","--heads","origin",BRANCH],cwd=root,env=env):
             raise RuntimeError("Azure work branch already exists; no force push")
         git(["checkout","-b",BRANCH],cwd=root)
         git(["config","user.name","AnHiepLuc Automation"],cwd=root)
