@@ -1,0 +1,23 @@
+name: AnHiepLuc - sync corrected XLS plan to Azure PR 10
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: read
+  issues: read
+jobs:
+  sync:
+    if: >-
+      ${{ github.event.issue.user.login == 'ngocnhanvo' &&
+          github.event.sender.login == 'ngocnhanvo' &&
+          github.event.issue.title == '[anhiepluc:sync-xls-plan-pr10]' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Update Azure PR document only
+        env:
+          AZURE_DEVOPS_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}
+        run: python3 scripts/sync_excel_plan_pr10.py
