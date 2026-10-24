@@ -1,0 +1,45 @@
+name: AnHiepLuc - execution access check
+
+on:
+  workflow_dispatch:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: read
+  issues: read
+
+jobs:
+  verify:
+    if: >-
+      ${{ github.event_name == 'workflow_dispatch' ||
+          (github.event.issue.user.login == 'ngocnhanvo' &&
+           github.event.sender.login == 'ngocnhanvo' &&
+           github.event.issue.title == '[anhiepluc:access-check]') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify runner access
+        shell: bash
+        run: |
+          echo "GITHUB_RUNNER=PASS"
+          echo "EXECUTION_REPO=${GITHUB_REPOSITORY}"
+          echo "SOURCE_REPO=Azure DevOps AnHiepLuc (not modified)"
+      - name: Verify Azure DevOps read access if PAT is configured
+        shell: bash
+        env:
+          AZURE_DEVOPS_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}
+        run: |
+          if [[ -z "${AZURE_DEVOPS_PAT}" ]]; then
+            echo "AZURE_READ=NOT_TESTED (AZURE_DEVOPS_PAT is not configured)"
+            exit 0
+          fi
+          status=$(curl --silent --show-error --max-time 30 \
+            --output /dev/null --write-out '%{http_code}' \
+            --user ":${AZURE_DEVOPS_PAT}" \
+            'https://dev.azure.com/vongocnhancd10cntt2/AnHiepLuc/_apis/git/repositories/AnHiepLuc?api-version=7.1')
+          if [[ "${status}" != "200" ]]; then
+            echo "::error::AZURE_READ=FAIL_HTTP_${status}"
+            exit 1
+          fi
+          echo "AZURE_READ=PASS_HTTP_200"
