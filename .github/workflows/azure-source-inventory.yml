@@ -1,0 +1,61 @@
+name: AnHiepLuc - private Azure source inventory
+on:
+  workflow_dispatch:
+  issues:
+    types: [opened]
+permissions:
+  contents: read
+  issues: read
+jobs:
+  inventory:
+    if: >-
+      ${{ github.event_name == 'workflow_dispatch' ||
+          (github.event.issue.user.login == 'ngocnhanvo' &&
+           github.event.sender.login == 'ngocnhanvo' &&
+           github.event.issue.title == '[anhiepluc:inventory]') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Compare target paths to public Anco1 reference without exposing Azure source
+        env:
+          AZURE_DEVOPS_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import base64, difflib, hashlib, os, pathlib, subprocess, tempfile, urllib.request, json
+          assert os.environ.get("AZURE_DEVOPS_PAT"), "Missing AZURE_DEVOPS_PAT"
+          basic=base64.b64encode((":"+os.environ["AZURE_DEVOPS_PAT"]).encode()).decode()
+          env=os.environ.copy()
+          env["AZURE_GIT_HEADER"]="AUTHORIZATION: Basic "+basic
+          url="https://dev.azure.com/vongocnhancd10cntt2/AnHiepLuc/_git/AnHiepLuc"
+          with tempfile.TemporaryDirectory() as d:
+            proc=subprocess.run(["git","--config-env=http.extraheader=AZURE_GIT_HEADER","clone","--depth=1","--quiet",url,d+"/src"],env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+            if proc.returncode:
+              raise RuntimeError("Azure clone failed (details suppressed to protect credentials)")
+            base=pathlib.Path(d)/"src"
+            branch=subprocess.check_output(["git","-C",str(base),"branch","--show-current"],text=True).strip()
+            sha=subprocess.check_output(["git","-C",str(base),"rev-parse","HEAD"],text=True).strip()
+            print("AZURE_CLONE=PASS; BRANCH="+branch+"; SHA="+sha)
+            rel=[
+              "eman_ver3/js/Module_script/MD_00_DSHangHoa_SOANTHAO.js",
+              "eman_ver3/js/Module_script/MD_00_DSHangHoa.js",
+              "eman_ver3/js/Module_script/MD_00_DSHangHoaVG.js",
+              "eman_ver3/Controller/JQGridModify/JQGridMD_00_DSHangHoa_SOANTHAOModify.ashx",
+              "eman_ver3/Controller/JQGridModify/JQGridMD_00_DSHangHoaModify.ashx",
+              "eman_ver3/Controller/JQGridModify/JQGridMD_00_DSHangHoaVGModify.ashx",
+            ]
+            for name in rel:
+              p=base/name
+              if not p.is_file():
+                print("TARGET="+name+"; EXISTS=NO")
+                continue
+              data=p.read_bytes()
+              c=data.decode("utf-8-sig",errors="replace")
+              try:
+                ref=urllib.request.urlopen("https://raw.githubusercontent.com/ngocnhanvo/anco1/master/"+name,timeout=30).read().decode("utf-8-sig",errors="replace")
+                sim=difflib.SequenceMatcher(None,c,ref,autojunk=True).ratio()
+              except Exception:
+                sim=-1
+              print("TARGET="+name+"; EXISTS=YES; BYTES="+str(len(data))+"; MATCH_ANCO1="+str(round(sim,4))+"; CASE_SOANTHAO="+str("CA01ExportHHVG_MD00DSHangHoaSOANTHAO" in c)+"; CASE_HH="+str("CA_01_ExportHH" in c)+"; CASE_VG="+str("CA_01_ExportHHVG" in c))
+            print("TARGET_PRODUCT_PATH_CHECK=PASS")
+          PY
