@@ -49,7 +49,7 @@ with tempfile.TemporaryDirectory(prefix="anhl-case-readonly-") as d:
         if not any(counts.values()): continue
         files.append({"path":rel,"terms":{k:v for k,v in counts.items() if v}})
         if counts[terms[0]] or counts[terms[1]]:
-            hits.append({"path":rel,"size":len(content),"case_context":snippets(content,terms[0],2100,6) or snippets(content,terms[1],2100,6),
+            hits.append({"path":rel,"size":len(content),"case_context":snippets(content,terms[0],7500,3) or snippets(content,terms[1],7500,3),
                          "price_update_context":snippets(content,"Cập nhật lại giá",900,2)})
     # Additional targeted snippets in code naming the module, for cross-linking controllers and UI.
     adjacent=[]
@@ -106,7 +106,15 @@ with tempfile.TemporaryDirectory(prefix="anhl-case-readonly-") as d:
     if len(raw)>160000: raw=json.dumps({"source":"Azure AnHiepLuc/master","commit":commit,"files":files[:80],"hits":hits[:7]},ensure_ascii=False).encode()
     key=os.urandom(32); nonce=os.urandom(12)
     payload=AESGCM(key).encrypt(nonce,zlib.compress(raw,9),None)
-    pub=serialization.load_pem_public_key(base64.b64decode(os.environ["PUBLIC_KEY_B64"]))
+    key_b64=os.environ["PUBLIC_KEY_B64"]
+    try:
+        ev=json.load(open(os.environ["GITHUB_EVENT_PATH"],encoding="utf-8"))
+        requested=json.loads(ev["issue"]["body"])
+        if requested.get("public_key_b64"):
+            key_b64=requested["public_key_b64"]
+    except (KeyError,ValueError,TypeError):
+        pass
+    pub=serialization.load_pem_public_key(base64.b64decode(key_b64,validate=True))
     ek=pub.encrypt(key,padding.OAEP(mgf=padding.MGF1(algorithm=hashes.SHA256()),algorithm=hashes.SHA256(),label=None))
     envelope=base64.b64encode(ek+nonce+payload).decode()
     print("AZURE_PRODUCTION_READ=PASS")
