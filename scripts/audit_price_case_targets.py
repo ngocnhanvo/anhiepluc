@@ -58,6 +58,19 @@ def derive():
             literals=[v if re.fullmatch(r'[A-Za-z_0-9-]{0,30}',v) else '<other>' for v in literals]
             symbols=re.findall(r'[A-Za-z_][A-Za-z0-9_]*|==|!=|<=|>=|&&|\\|\\||=',line)
             output["focus"].append({"line":n,"symbols":symbols[:40],"literals":literals[:10]})
+        output["focused_predicates"]=[]
+        for n in (66,78,82,92,95,96,98,103,105,162,163,164,165,167,172,173):
+            if n>len(lines):continue
+            value=lines[n-1]
+            tokens=re.findall(r'[A-Za-z_][A-Za-z0-9_]*|==|!=|<=|>=|&&|\\|\\||=',value)
+            output["focused_predicates"].append({
+              "line":n,
+              "tokens":tokens[:45],
+              "empty_string_literal":'""' in value,
+              "single_space_literal":'" "' in value,
+              "has_null":bool(re.search(r'\\bnull\\b',value,re.I)),
+              "numbers":re.findall(r'(?<![A-Za-z_])[-]?[0-9]+(?![A-Za-z_])',value)[:8]
+            })
         return output
 if __name__=="__main__":
     result=derive()
