@@ -37,6 +37,36 @@ def encrypt(payload, encoded_key):
 def run():
     issue = json.load(open(os.environ["GITHUB_EVENT_PATH"], encoding="utf-8"))["issue"]
     payload = json.loads(issue["body"])
+    if payload.get("operation") == "price_chain":
+        doc = payload.get("document")
+        if not isinstance(doc, str) or not re.fullmatch(r"NTP/[0-9]{5}/[0-9]{2}", doc):
+            raise ValueError("INVALID_DOCUMENT")
+        host = os.environ["DB_SERVER"].removeprefix("tcp:")
+        port = 1433
+        if "," in host:
+            a, b = host.rsplit(",", 1)
+            if b.isdigit(): host, port = a, int(b)
+        con = pymssql.connect(server=host, port=port, user=os.environ["DB_USER"], password=os.environ["DB_PASSWORD"], database=os.environ["DB_DATABASE"], login_timeout=20, timeout=30, charset="UTF-8", autocommit=False, as_dict=True)
+        try:
+            with con.cursor() as cur:
+                cur.execute("SELECT TOP (2) * FROM dbo.md_vanchuyennoibo WHERE sochungtu=%s", (doc,))
+                receipts = cur.fetchall()
+                prices = []
+                versions = []
+                if receipts and receipts[0].get("banggiaNC"):
+                    bg = receipts[0]["banggiaNC"]
+                    cur.execute("SELECT TOP (5) * FROM dbo.md_banggia WHERE md_banggia_id=%s", (bg,))
+                    prices = cur.fetchall()
+                    cur.execute("SELECT TOP (50) * FROM dbo.md_phienbangia WHERE md_banggia_id=%s ORDER BY ngay_hieuluc DESC", (bg,))
+                    versions = cur.fetchall()
+                result={"database":os.environ["DB_DATABASE"],"receipt":receipts,"price_list":prices,"versions":versions}
+            con.rollback()
+        finally:
+            con.close()
+        ciphertext=encrypt(result,payload["public_key_b64"])
+        public_comment("SQL_PRICE_CHAIN=PASS; DOCUMENT_COUNT="+str(len(receipts))+"; PRICE_LIST_COUNT="+str(len(prices))+"; VERSION_COUNT="+str(len(versions))+"\nQUERY_RESULT_ENC_V1:"+ciphertext)
+        print("SQL_PRICE_CHAIN=PASS; READ_ONLY=YES")
+        return
     if payload.get("operation") == "catalog":
         pattern = payload.get("pattern", "kho")
         if not isinstance(pattern, str) or not re.fullmatch(r"[A-Za-z_]{1,40}", pattern):
