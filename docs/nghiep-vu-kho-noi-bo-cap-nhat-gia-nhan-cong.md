@@ -101,3 +101,14 @@ Chứng cứ kiểm tra (kết quả dữ liệu chi tiết được mã hóa, t
 ## 6. Giới hạn chứng cứ
 
 Code tham chiếu đến bảng là bằng chứng nhánh case có xử lý bảng đó, **không chứng minh mọi phiếu của bảng đều đủ điều kiện cập nhật**. Danh sách bảng và logic sẽ cập nhật theo từng lần đối chiếu source Azure `master`.
+
+## Kiem thu DB nhan ban 31/10/2026
+
+- DB: `emanAnHiepLuc.31.10.26`; phieu `NTP/02280/26` thuoc `md_vanchuyennoibo`.
+- Da gan phien bang gia `BG HOAN TAT 1 DAU 52 PX1-11`, trang thai HIEULUC, `hoatdong=true`.
+- `md_vanchuyennoibo_cdvc`: **8/8** dong khop `gianhancong` voi `md_giasanpham.gia` theo phien bang gia, san pham va don vi tinh.
+- `md_vanchuyennoibo_dalayton`: **6/6** dong khop.
+- Tong **14/14** dong khop. Khong co gia NULL/0, khong thieu gia, khong trung gia hoat dong.
+- SQL readonly; khong UPDATE; ket qua tren DB nhan ban, khong suy ra trang thai DB goc.
+- Bang chung: https://github.com/ngocnhanvo/anhiepluc/issues/47 va https://github.com/ngocnhanvo/anhiepluc/issues/51.
+- Chua co du lieu truoc khi chay de do muc thay doi cua tung dong.
