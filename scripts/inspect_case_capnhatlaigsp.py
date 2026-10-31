@@ -67,11 +67,11 @@ with tempfile.TemporaryDirectory(prefix="anhl-case-readonly-") as d:
             "case_files":[],"other_files":[]}
     for hit in hits[:15]:
         contexts=[x.get("context","") for x in hit["case_context"]]
-        joined="\\n".join(contexts)
-        tables=sorted(set(re.findall(r"\\b(?:dbo\\.)?(?:md|c|ad|gs)_[A-Za-z0-9_]+",joined,re.I)))
-        updates=sorted(set(re.findall(r"\\bUPDATE\\s+(?:dbo\\.)?([A-Za-z_][A-Za-z0-9_]*)",joined,re.I)))
-        procedures=sorted(set(re.findall(r"\\b(?:EXEC|EXECUTE)\\s+(?:dbo\\.)?([A-Za-z_][A-Za-z0-9_]*)",joined,re.I)))
-        names=sorted(set(re.findall(r"\\b(?:CA_[A-Za-z0-9_]+|MD_[A-Za-z0-9_]+)",joined,re.I)))
+        joined="\n".join(contexts)
+        tables=sorted(set(re.findall(r"\b(?:dbo\.)?(?:md|c|ad|gs)_[A-Za-z0-9_]+",joined,re.I)))
+        updates=sorted(set(re.findall(r"\bUPDATE\s+(?:dbo\.)?([A-Za-z_][A-Za-z0-9_]*)",joined,re.I)))
+        procedures=sorted(set(re.findall(r"\b(?:EXEC|EXECUTE)\s+(?:dbo\.)?([A-Za-z_][A-Za-z0-9_]*)",joined,re.I)))
+        names=sorted(set(re.findall(r"\b(?:CA_[A-Za-z0-9_]+|MD_[A-Za-z0-9_]+)",joined,re.I)))
         flags={key:bool(re.search(key,joined,re.I)) for key in
            ("PVCNoiBo","CacDongVanChuyen","van_chuyen","nhap_kho","phienbanggia",
             "capnhatlaigsp","SaveChanges","SubmitChanges","SqlCommand","ExecuteSql",
