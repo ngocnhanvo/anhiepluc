@@ -1,0 +1,29 @@
+name: AnHiepLuc cloned DB labor price verification
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: read
+  issues: write
+jobs:
+  verify:
+    if: >-
+      ${{ github.event.issue.user.login == 'ngocnhanvo' &&
+          github.event.sender.login == 'ngocnhanvo' &&
+          github.event.issue.title == '[anhiepluc:verify-clone-labor-prices]' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install read-only SQL dependencies
+        run: python -m pip install -q 'pymssql>=2.3,<3' 'cryptography>=43,<50'
+      - name: Compare saved labor prices with active version price rows
+        env:
+          DB_SERVER: ${{ secrets.ANHIEPLUC_SQL_SERVER }}
+          DB_USER: ${{ secrets.ANHIEPLUC_SQL_USER }}
+          DB_PASSWORD: ${{ secrets.ANHIEPLUC_SQL_PASSWORD }}
+          DB_DATABASE: ${{ secrets.ANHIEPLUC_SQL_DATABASE }}
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/verify_cloned_db_labor_prices.py
