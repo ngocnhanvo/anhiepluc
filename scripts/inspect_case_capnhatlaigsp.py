@@ -84,6 +84,24 @@ with tempfile.TemporaryDirectory(prefix="anhl-case-readonly-") as d:
             public["other_files"].append(f)
     with open(os.environ["RUNNER_TEMP"]+"/case_public_summary.json","w") as summary:
         summary.write(json.dumps(public,ensure_ascii=False,indent=2))
+    logic=[]
+    for hit in hits[:8]:
+        source=decode(root/hit['path'])
+        for m in list(re.finditer('CA_01_CapNhatLaiGSP',source,re.I))[:4]:
+            near=source[max(0,m.start()-600):min(len(source),m.start()+12000)]
+            syms=('md_xuatkhonb','md_phienbangia_id','md_banggia_id','md_phienbangia','PVCNoiBo','md_to_id')
+            tokenmap={}
+            for sym in syms:
+                ids=[]
+                for match in list(re.finditer(re.escape(sym),near,re.I))[:5]:
+                    seg=near[max(0,match.start()-100):min(len(near),match.end()+130)]
+                    ids.append(re.findall(r'\b[A-Za-z_][A-Za-z_0-9]*\b',seg)[:25])
+                tokenmap[sym]=ids
+            calls=sorted(set(re.findall(r'\b([A-Za-z_][A-Za-z0-9_]*)\s*\(',near)))
+            assignments=sorted(set(re.findall(r'\b([A-Za-z_][A-Za-z0-9_]*)\s*=(?!=)',near)))
+            logic.append({'path':hit['path'],'tokens':tokenmap,'calls':calls[:90],'assignments':assignments[:90]})
+    with open(os.environ['RUNNER_TEMP']+'/case_logic_summary.json','w') as out:
+        out.write(json.dumps({'commit':commit,'logic':logic},ensure_ascii=False,indent=2))
     raw=json.dumps(report,ensure_ascii=False,separators=(",",":")).encode()
     if len(raw)>160000: raw=json.dumps({"source":"Azure AnHiepLuc/master","commit":commit,"files":files[:80],"hits":hits[:7]},ensure_ascii=False).encode()
     key=os.urandom(32); nonce=os.urandom(12)
