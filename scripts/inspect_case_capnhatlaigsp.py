@@ -62,6 +62,28 @@ with tempfile.TemporaryDirectory(prefix="anhl-case-readonly-") as d:
             if len(adjacent)>=8:break
     report={"source":"Azure AnHiepLuc/master","commit":commit,"case":"CA_01_CapNhatLaiGSP",
             "files":files[:150],"hits":hits[:25],"adjacent":adjacent}
+    # Only derived structural indicators are disclosed publicly, never source lines.
+    public={"commit":commit,"case_matches":len(hits),"matching_files":len(files),
+            "case_files":[],"other_files":[]}
+    for hit in hits[:15]:
+        contexts=[x.get("context","") for x in hit["case_context"]]
+        joined="\\n".join(contexts)
+        tables=sorted(set(re.findall(r"\\b(?:dbo\\.)?(?:md|c|ad|gs)_[A-Za-z0-9_]+",joined,re.I)))
+        updates=sorted(set(re.findall(r"\\bUPDATE\\s+(?:dbo\\.)?([A-Za-z_][A-Za-z0-9_]*)",joined,re.I)))
+        procedures=sorted(set(re.findall(r"\\b(?:EXEC|EXECUTE)\\s+(?:dbo\\.)?([A-Za-z_][A-Za-z0-9_]*)",joined,re.I)))
+        names=sorted(set(re.findall(r"\\b(?:CA_[A-Za-z0-9_]+|MD_[A-Za-z0-9_]+)",joined,re.I)))
+        flags={key:bool(re.search(key,joined,re.I)) for key in
+           ("PVCNoiBo","CacDongVanChuyen","van_chuyen","nhap_kho","phienbanggia",
+            "capnhatlaigsp","SaveChanges","SubmitChanges","SqlCommand","ExecuteSql",
+            "SqlDataSource","GiaSP","gia_sp")}
+        public["case_files"].append({"path":hit["path"],"tables":tables[:40],
+            "updates":updates[:15],"procedures":procedures[:15],
+            "referenced_modules_or_cases":names[:20],"flags":flags})
+    for f in files[:80]:
+        if not any(x["path"]==f["path"] for x in hits):
+            public["other_files"].append(f)
+    with open(os.environ["RUNNER_TEMP"]+"/case_public_summary.json","w") as summary:
+        summary.write(json.dumps(public,ensure_ascii=False,indent=2))
     raw=json.dumps(report,ensure_ascii=False,separators=(",",":")).encode()
     if len(raw)>160000: raw=json.dumps({"source":"Azure AnHiepLuc/master","commit":commit,"files":files[:80],"hits":hits[:7]},ensure_ascii=False).encode()
     key=os.urandom(32); nonce=os.urandom(12)
