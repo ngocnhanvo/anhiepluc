@@ -146,6 +146,8 @@ def main():
         if base != AUDITED_SHA:
             raise RuntimeError("MASTER_SHA_DRIFT_STOP_AND_REAUDIT")
         f = root/TARGET
+        raw_bytes=f.read_bytes()
+        print("SOURCE_LINE_ENDINGS=CRLF:"+str(raw_bytes.count(b"\\r\\n"))+";LF:"+str(raw_bytes.count(b"\\n")))
         before, encoding, crlf = decode_file(f)
         after, changed = patch(before)
         verify(before, after, changed)
@@ -155,7 +157,12 @@ def main():
         f.write_bytes(after.replace("\n", "\r\n" if crlf else "\n").encode(encoding))
         actual = set(git("diff", "--name-only", cwd=root).splitlines())
         if actual != {TARGET}: raise RuntimeError("UNEXPECTED_FILE_CHANGE")
-        if subprocess.run(["git","diff","--check"],cwd=root,capture_output=True).returncode:
+        print("GIT_DIFF_NUMSTAT="+git("diff","--numstat",cwd=root).replace(TARGET,"TARGET_FILE"))
+        check=subprocess.run(["git","diff","--check"],cwd=root,capture_output=True)
+        if check.returncode:
+            messages=check.stdout.decode("utf-8","replace").splitlines()
+            print("WHITESPACE_ISSUES="+str(len(messages)))
+            print("WHITESPACE_TYPES="+",".join(sorted(set("trailing" if "trailing whitespace" in m else "blank-eof" if "new blank line" in m else "other" for m in messages))))
             raise RuntimeError("WHITESPACE_CHECK_FAILED")
         print("PATCH_SCOPE=PASS; FILES=1; PATCH_HUNKS=2; DIFF_CHECK=PASS")
         if mode == "preview":
