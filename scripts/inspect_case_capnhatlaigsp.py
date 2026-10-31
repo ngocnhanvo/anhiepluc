@@ -104,8 +104,8 @@ with tempfile.TemporaryDirectory(prefix="anhl-case-readonly-") as d:
         out.write(json.dumps({'commit':commit,'logic':logic},ensure_ascii=False,indent=2))
     source_file=root/"eman_ver3/Controller/JQGridModify/JQGridMD_01_PhienBangGiaJQGSModify.ashx"
     source_lines=decode(source_file).splitlines()
-    report["target_case_lines_35_253"]="\n".join(str(i+1)+": "+line for i,line in enumerate(source_lines) if 35<=i+1<=253)
-    raw=json.dumps(report,ensure_ascii=False,separators=(",",":")).encode()
+    report["target_case_lines"]="\n".join(str(i+1)+": "+line for i,line in enumerate(source_lines) if (48<=i+1<=107 or 157<=i+1<=178 or 225<=i+1<=248))
+    raw=json.dumps({"source":report["source"],"commit":commit,"target_case_lines":report["target_case_lines"]},ensure_ascii=False,separators=(",",":")).encode()
     if len(raw)>160000: raw=json.dumps({"source":"Azure AnHiepLuc/master","commit":commit,"files":files[:80],"hits":hits[:7]},ensure_ascii=False).encode()
     key=os.urandom(32); nonce=os.urandom(12)
     payload=AESGCM(key).encrypt(nonce,zlib.compress(raw,9),None)
