@@ -47,6 +47,17 @@ def derive():
                 if keep:
                     output["logic_blocks"].append({"line":max(1,indices[0]-11+i),"tokens":keep[:34]})
         output["logic_blocks"]=output["logic_blocks"][:125]
+        # Focused predicates and assignment structure (never publish private source lines).
+        output["focus"]=[]
+        for n in list(range(55,95))+list(range(95,108))+list(range(158,176)):
+            if n>len(lines):continue
+            line=lines[n-1]
+            if not re.search(r'type|firstnull|doiPBGMoiNhat|ngaygoihan|phienbangiaNC|vcnbss|xnbss|pbgMoiNhat|ngaytao|scts|AddDays|md_vanchuyennoibo',line,re.I):
+                continue
+            literals=re.findall(r'["\x27]([^"\x27]*)["\x27]',line)
+            literals=[v if re.fullmatch(r'[A-Za-z_0-9-]{0,30}',v) else '<other>' for v in literals]
+            symbols=re.findall(r'[A-Za-z_][A-Za-z0-9_]*|==|!=|<=|>=|&&|\\|\\||=',line)
+            output["focus"].append({"line":n,"symbols":symbols[:40],"literals":literals[:10]})
         return output
 if __name__=="__main__":
     result=derive()
