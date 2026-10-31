@@ -36,7 +36,7 @@ def master():
 
 def verify_master():
     env=os.environ.copy()
-    env["AZURE_GIT_HEADER"]=HEADERS["Authorization"]
+    env["AZURE_GIT_HEADER"]="AUTHORIZATION: "+HEADERS["Authorization"]
     with tempfile.TemporaryDirectory(prefix="anhl-verify-") as d:
         dest=pathlib.Path(d)/"azure"
         cmd=["git","--config-env=http.extraheader=AZURE_GIT_HEADER","clone","--quiet","--depth=1","--branch","master",REMOTE,str(dest)]
