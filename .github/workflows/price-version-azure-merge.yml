@@ -1,0 +1,37 @@
+name: AnHiepLuc price version guarded Azure merge
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: read
+  issues: write
+jobs:
+  merge:
+    if: >-
+      ${{ github.event.issue.user.login == 'ngocnhanvo' &&
+          github.event.sender.login == 'ngocnhanvo' &&
+          github.event.issue.title == '[anhiepluc:price-fix-merge]' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Validate guarded merge script
+        run: python3 -m py_compile scripts/merge_price_version_pr.py
+      - name: Merge verified Azure PR; verify master source
+        env:
+          AZURE_DEVOPS_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/merge_price_version_pr.py | tee "$RUNNER_TEMP/price_merge_result.txt"
+      - name: Report result
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          if test -f "$RUNNER_TEMP/price_merge_result.txt"; then
+            gh issue comment ${{ github.event.issue.number }} --repo ${{ github.repository }} --body-file "$RUNNER_TEMP/price_merge_result.txt"
+          fi
