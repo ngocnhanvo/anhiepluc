@@ -26,6 +26,28 @@ Với `md_xuatkhonb`, code gán `phienbangiaNC` từ phiên bảng giá được
 Các biến/điều kiện quan trọng phải rà khi có phiếu không được cập nhật:
 `type` (chế độ), `scts` (danh sách chứng từ), `firstnull`, `doiPBGMoiNhat`, `ngaygoihan`, `md_phienbangia.hoatdong` và `ngay_hieuluc`. Sự hiện diện của những biến này **chưa chứng minh bản ghi cụ thể đáp ứng bộ lọc**.
 
+### 2.1. Ma trận hỗ trợ — đối chiếu trực tiếp code Azure
+
+Nguồn quét: Azure `master`, SHA `5a9ed179ae95e2e5139297b5e4899a3d89e835d3`,
+`JQGridMD_01_PhienBangGiaJQGSModify.ashx` (xem [kết quả kiểm toán code #35](https://github.com/ngocnhanvo/anhiepluc/issues/35)).
+
+| Bảng header | Nhánh cập nhật giá nhân công trong case? | Các bảng detail được xử lý |
+|---|---|---|
+| `md_nhapkhonb` | **Không** — không có truy cập `db.md_nhapkhonb` trong case | Không thấy trong case |
+| `md_xuatkhonb` | **Có**, vùng dòng ~93–160 | `md_xuatkhonb_cdh`; tra `md_giasanpham` |
+| `md_vanchuyennoibo` | **Có**, vùng dòng ~162–228 | `md_vanchuyennoibo_cdvc`, `md_vanchuyennoibo_dalayton`; tra `md_giasanpham` |
+
+Bảng `md_nhapkhonb` có nghiệp vụ riêng nhưng **không được case hiện tại cập nhật giá**.
+
+### 2.2. Các nhánh xử lý và điểm khác biệt
+
+- Case đọc `type`, `scts` và `doiPBGMoiNhat`. Khi `type == "2"`, cả hai nhánh đều có đường lọc theo tập số chứng từ `scts`. Ở nhánh còn lại có ràng buộc `ngaytao >= ngaygoihan` (giới hạn ngày tính từ thời điểm chạy).
+- `md_xuatkhonb`: nếu `doiPBGMoiNhat == "1"` thì gán `xnb.phienbangiaNC = pbgMoiNhat.md_phienbangia_id`; nếu không và `type == "2"`, gán `xnb.phienbangiaNC = pbg.md_phienbangia_id` (dòng ~103–106).
+- `md_vanchuyennoibo`: trong đoạn đã rà, **chỉ thấy** gán `xnb.phienbangiaNC = pbgMoiNhat.md_phienbangia_id` khi `doiPBGMoiNhat == "1"` (dòng ~172–173). **Không có nhánh gán phiên được chọn tương ứng với `type == "2"` như ở `md_xuatkhonb`** trước khi xử lý các dòng chi tiết.
+- Vòng lặp chi tiết tìm giá nhân công theo `phienbangiaNC` và cập nhật `gianhancong`, sau đó có `SaveChanges` / transaction. Chỉ thấy phiên tồn tại trong bảng giá chưa đảm bảo giá nhân công sẽ được cập nhật đúng.
+
+**Nguy cơ lỗi nghiệp vụ:** thao tác cập nhật theo danh sách số chứng từ `type == "2"`, nhưng không bật `doiPBGMoiNhat == "1"`, có thể khiến phiếu `md_vanchuyennoibo` vẫn không được gán phiên, trong khi `md_xuatkhonb` có thể gán phiên được chọn. Đây là khác biệt có chứng cứ code; cần kiểm tra chính xác tham số UI và giá trị `phienbangiaNC` đầu vào trước khi khẳng định nguyên nhân cuối cùng của một phiếu cụ thể.
+
 ## 3. Trường hợp thực tế đã xác minh bằng SQL (2026-10-31)
 
 - Một phiếu chuyển kho nội bộ được xác nhận hiện diện **1 dòng** trong `md_vanchuyennoibo`, **0 dòng** trong `md_nhapkhonb`.
