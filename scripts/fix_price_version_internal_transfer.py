@@ -147,7 +147,7 @@ def main():
             raise RuntimeError("MASTER_SHA_DRIFT_STOP_AND_REAUDIT")
         f = root/TARGET
         raw_bytes=f.read_bytes()
-        print("SOURCE_LINE_ENDINGS=CRLF:"+str(raw_bytes.count(b"\\r\\n"))+";LF:"+str(raw_bytes.count(b"\\n")))
+        print("SOURCE_LINE_ENDINGS=CRLF:"+str(raw_bytes.count(bytes([13,10])))+";LF:"+str(raw_bytes.count(bytes([10]))))
         before, encoding, crlf = decode_file(f)
         after, changed = patch(before)
         verify(before, after, changed)
@@ -158,7 +158,7 @@ def main():
         actual = set(git("diff", "--name-only", cwd=root).splitlines())
         if actual != {TARGET}: raise RuntimeError("UNEXPECTED_FILE_CHANGE")
         print("GIT_DIFF_NUMSTAT="+git("diff","--numstat",cwd=root).replace(TARGET,"TARGET_FILE"))
-        check=subprocess.run(["git","diff","--check"],cwd=root,capture_output=True)
+        check=subprocess.run(["git","-c","core.whitespace=cr-at-eol","diff","--check"],cwd=root,capture_output=True)
         if check.returncode:
             messages=check.stdout.decode("utf-8","replace").splitlines()
             print("WHITESPACE_ISSUES="+str(len(messages)))
