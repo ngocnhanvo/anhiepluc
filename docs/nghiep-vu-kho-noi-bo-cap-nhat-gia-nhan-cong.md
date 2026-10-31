@@ -48,12 +48,23 @@ Bảng `md_nhapkhonb` có nghiệp vụ riêng nhưng **không được case hi�
 
 **Nguy cơ lỗi nghiệp vụ:** thao tác cập nhật theo danh sách số chứng từ `type == "2"`, nhưng không bật `doiPBGMoiNhat == "1"`, có thể khiến phiếu `md_vanchuyennoibo` vẫn không được gán phiên, trong khi `md_xuatkhonb` có thể gán phiên được chọn. Đây là khác biệt có chứng cứ code; cần kiểm tra chính xác tham số UI và giá trị `phienbangiaNC` đầu vào trước khi khẳng định nguyên nhân cuối cùng của một phiếu cụ thể.
 
+### 2.3. Kết luận điều tra nhánh `md_vanchuyennoibo` (đã xác minh)
+
+Source Azure `master`, SHA `5a9ed179ae95e2e5139297b5e4899a3d89e835d3`; [audit #37](https://github.com/ngocnhanvo/anhiepluc/issues/37).
+
+- Dòng 162–163: khởi tạo tập `md_vanchuyennoibo` với bộ lọc `phienbangiaNC == id` (`id` là phiên bảng giá truyền vào case).
+- `type == "2"`: bổ sung lọc theo danh sách số chứng từ `scts`; không loại bỏ bộ lọc phiên có sẵn.
+- Kết quả: chứng từ có `phienbangiaNC` rỗng không thể vào danh sách, ngay cả khi chỉ định đúng số chứng từ. Đây là nguyên nhân rõ ràng khiến chức năng không thể gắn phiên cho phiếu chưa có phiên.
+- Dòng 172–173: chỉ có nhánh gán `pbgMoiNhat.md_phienbangia_id` nếu `doiPBGMoiNhat == "1"`; thiếu nhánh gán phiên đã chọn như `md_xuatkhonb` ở dòng 105–106.
+- Chế độ không chọn số chứng từ có giới hạn `ngaytao >= DateTime.Now.AddDays(-120)`; không giải quyết lỗi lọc phiên rỗng.
+
+**Hướng sửa chưa thực hiện:** cho phép chọn chứng từ chưa gắn phiên trong đường cập nhật theo số chứng từ; xác thực phiên thuộc bảng giá phiếu; gắn header và tính lại giá dòng trong transaction. Không sửa production trước khi kiểm thử.
 ## 3. Trường hợp thực tế đã xác minh bằng SQL (2026-10-31)
 
 - Một phiếu chuyển kho nội bộ được xác nhận hiện diện **1 dòng** trong `md_vanchuyennoibo`, **0 dòng** trong `md_nhapkhonb`.
 - Phiếu ở trạng thái `HIEULUC`, có khóa `banggiaNC`, nhưng trường `phienbangiaNC` còn rỗng.
 - Bảng giá liên kết có **11 phiên bảng giá** trong `md_phienbangia` (chỉ đếm số phiên, chưa kết luận phiên nào phù hợp).
-- Kết quả trên chỉ xác nhận lỗi thiếu phiên; **chưa kết luận** đó là lỗi ngày giới hạn, chế độ `type`, lọc chứng từ, hoạt động phiên hay cách lưu giá dòng.
+- Đối chiếu code đã xác định nhánh `md_vanchuyennoibo` lọc `phienbangiaNC == id`, nên bỏ qua chứng từ đang trống phiên. Chưa có cập nhật dữ liệu hoặc source production.
 
 Chứng cứ kiểm tra (kết quả dữ liệu chi tiết được mã hóa, tránh công khai thông tin kinh doanh):
 - [Đối chiếu bảng chứng từ, Issue #28](https://github.com/ngocnhanvo/anhiepluc/issues/28)
