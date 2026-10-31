@@ -37,6 +37,35 @@ def encrypt(payload, encoded_key):
 def run():
     issue = json.load(open(os.environ["GITHUB_EVENT_PATH"], encoding="utf-8"))["issue"]
     payload = json.loads(issue["body"])
+    if payload.get("operation") == "catalog":
+        pattern = payload.get("pattern", "kho")
+        if not isinstance(pattern, str) or not re.fullmatch(r"[A-Za-z_]{1,40}", pattern):
+            raise ValueError("INVALID_CATALOG_PATTERN")
+        host = os.environ["DB_SERVER"]
+        if host.lower().startswith("tcp:"):
+            host = host[4:]
+        port = 1433
+        if "," in host:
+            a, b = host.rsplit(",", 1)
+            if b.isdigit():
+                host, port = a, int(b)
+        conn = pymssql.connect(server=host, port=port, user=os.environ["DB_USER"], password=os.environ["DB_PASSWORD"], database=os.environ["DB_DATABASE"], login_timeout=20, timeout=30, charset="UTF-8", autocommit=False, as_dict=True)
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT DB_NAME() AS dbname")
+                dbname = cur.fetchone()["dbname"]
+                cur.execute("SELECT TOP (100) s.name AS schema_name, t.name AS table_name FROM sys.tables t INNER JOIN sys.schemas s ON s.schema_id = t.schema_id WHERE t.name LIKE %s ORDER BY t.name", ("%" + pattern + "%",))
+                tables = cur.fetchall()
+                cur.execute("SELECT HAS_DBACCESS(DB_NAME()) AS has_db_access")
+                dbaccess = cur.fetchone()["has_db_access"]
+            conn.rollback()
+        finally:
+            conn.close()
+        report = {"dbname": dbname, "pattern": pattern, "matching_tables": tables, "has_db_access": dbaccess}
+        encrypted = encrypt(report, payload["public_key_b64"])
+        public_comment("SQL_CATALOG=PASS; MATCHING_TABLES=" + str(len(tables)) + "\nQUERY_RESULT_ENC_V1:" + encrypted)
+        print("SQL_CATALOG=PASS; READ_ONLY=YES")
+        return
     if set(payload) - {"table", "schema", "where", "max_rows", "public_key_b64"}:
         raise ValueError("INVALID_REQUEST_FIELDS")
     table = payload["table"]
