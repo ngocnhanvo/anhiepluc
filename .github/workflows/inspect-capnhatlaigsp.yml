@@ -1,0 +1,33 @@
+name: AnHiepLuc - inspect price update case read-only
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: read
+  issues: write
+jobs:
+  inspect:
+    if: >-
+      ${{ github.event.issue.user.login == 'ngocnhanvo' &&
+          github.event.sender.login == 'ngocnhanvo' &&
+          github.event.issue.title == '[anhiepluc:inspect-capnhatlaigsp]' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install dependency
+        run: python -m pip install -q 'cryptography>=43,<50'
+      - name: Read Azure master and prepare encrypted report
+        env:
+          AZURE_DEVOPS_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}
+          PUBLIC_KEY_B64: LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0KTUlJQklqQU5CZ2txaGtpRzl3MEJBUUVGQUFPQ0FROEFNSUlCQ2dLQ0FRRUFyRXpLa0RTNnBUN3k5ZFNPRjNvZgpYWGUrZ1g3UjdCRlN3K3lqSVQ5b0tINVVRSTBHVjBnTUhxNUVkR3M1c0RYTDl1Q0x0cTJyM0NSK290aUIra3ZXCjN0aTZqa1pEcFJNQzFjaG9BeWsveE5zMkJ2emsyZkhCOUZPelI0YW9GWE5QWGsyOGVhVkRpQlVNTFVDZHVrUkYKTWhGZjArYVdZclJNSGx0WlZBUVVqOUFzUjBxZ29qMXB5S1QwTC9IeTc3VmRJd0VSVlVaamZyRzM0RFIydjN0WgpxZkhEVTVtVWNGWnFyWkpuaENseGVCYVIxUjgrU3k5NFJhVW9sbDVtblVkS1hOcmwwMlQzekZnOC9UQkVyWk9iCmRuMkxzeUhWU3BLZWJoOGZGaXRjRUR2VEJUbFdHbThyZCtPYWtwb1B3eEJNV1hLaFgwMWoybWhRSHN1M3MxMngKbFFJREFRQUIKLS0tLS1FTkQgUFVCTElDIEtFWS0tLS0tCg==
+        run: python3 scripts/inspect_case_capnhatlaigsp.py
+      - name: Publish encrypted diagnostic
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh issue comment ${{ github.event.issue.number }} --repo ${{ github.repository }} --body-file "$RUNNER_TEMP/case_inspection.txt"
