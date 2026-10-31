@@ -1,0 +1,61 @@
+name: AnHiepLuc - read SQL database name
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: read
+  issues: write
+jobs:
+  read_db_name:
+    if: >-
+      ${{ github.event.issue.user.login == 'ngocnhanvo' &&
+          github.event.sender.login == 'ngocnhanvo' &&
+          github.event.issue.title == '[anhiepluc:db-name-check]' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - name: Install SQL client
+        run: python -m pip install --disable-pip-version-check -q 'pymssql>=2.3,<3'
+      - name: Query and encrypt current database name
+        shell: bash
+        env:
+          DB_SERVER: ${{ secrets.ANHIEPLUC_SQL_SERVER }}
+          DB_USER: ${{ secrets.ANHIEPLUC_SQL_USER }}
+          DB_PASSWORD: ${{ secrets.ANHIEPLUC_SQL_PASSWORD }}
+          DB_DATABASE: ${{ secrets.ANHIEPLUC_SQL_DATABASE }}
+          PUBLIC_KEY_B64: LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0KTUlJQ0lqQU5CZ2txaGtpRzl3MEJBUUVGQUFPQ0FnOEFNSUlDQ2dLQ0FnRUF1cWNMeTgrRGE3S0QzZTArNTlMbwpZNkYrZ2h2bk1GM1dkY2FEVStxSCtUNWwrYXJXWmo5V3JkWXF4SkxMTjlKb3NnRGl4N2RpUFpXRG93ck5haWQ3CkhJMk5kNCtzYTVKYU1uSDdzWWhIellGbG9vSXd3dzVUOTkxRFA0M1FXcXRYYkd2QjEyOXFXNU0vNE9jUHZqczAKeDhMdjhEQXh3c1ZPdTl0WjZGWWxxaDMzOVFya3JYakdGRDhrTlFidGJoQUxlODJTK3JnQjQxcGpMYzB5aWlPbwpMZVZXTXdaU2hsaVFLMWIxTHgxM25tcUtqY2dIaTNiTk5OanM5TTdld0wyZGYwajlEMDR4TFNoS1g1S1RKS2pUCjNBbVZwNjVtS0RGUmVhN09sRXppdSttaE1EL1hzZStPdGladUpGTkcvR29QTDJYWmpVUldtU3p5NXhNc0xZRUMKMlZaR2xQRWFwNXNPenpTQTA5VDAvVTdZUHJCUFlUNHUxYk85T1lGc2hZZzVVcldDL0xUdk83Vy9yVEZrbjYzTwpSVmFpWDJJbEZsQVBpM0pnQU5US0lKdVFGWm9LTVIxL3JLZ3VlK09mc1JVOFZCc2dZb3BTbHVlejF5QktmUFAxCm1hK3BHQnVxMnJhbnNlcXV1c1diYTRsdDJwM0dObHFXaVB3Qk45RmppK3E1SzBmWXUvRVFDV1l5ZG9mTmdGYkUKSXltQ0lZcnVNWmREQndvN0JEcmM0SDk4TlA4T3JlRFdza0hWaVpBYjZUMTZ4REdGS1c3M2JuazBCKytWUWE3cwpTRWdZNmFOZjljUFBPZUwyZzJIa1pMbXh3bzZySFJLNWl6ZCtrNHBzRWM3NCtobGR3WFhhTitUckRFQjA4R20zCkd4LzZHTG9XYWNVdjY1RHMvSEpmeWFVQ0F3RUFBUT09Ci0tLS0tRU5EIFBVQkxJQyBLRVktLS0tLQo=
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_ID: ${{ github.event.issue.number }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$PUBLIC_KEY_B64" | base64 -d > "$RUNNER_TEMP/dbpub.pem"
+          python - <<'PY' > "$RUNNER_TEMP/sql_db_name.txt"
+          import os, pymssql
+          keys=('DB_SERVER','DB_USER','DB_PASSWORD','DB_DATABASE')
+          if not all(os.getenv(key) for key in keys):
+              print('ERROR:SQL_SECRETS_MISSING')
+          else:
+              server=os.environ['DB_SERVER']
+              if server.lower().startswith('tcp:'): server=server[4:]
+              port=1433
+              if ',' in server:
+                  host,number=server.rsplit(',',1)
+                  if number.isdigit(): server,port=host,int(number)
+              try:
+                  conn=pymssql.connect(server=server,port=port,user=os.environ['DB_USER'],password=os.environ['DB_PASSWORD'],database=os.environ['DB_DATABASE'],login_timeout=15,timeout=15,charset='UTF-8')
+                  try:
+                      with conn.cursor() as cursor:
+                          cursor.execute('SELECT DB_NAME()')
+                          row=cursor.fetchone()
+                          print('OK:'+str(row[0]) if row and row[0] else 'ERROR:DB_NAME_NULL')
+                  finally:
+                      conn.close()
+              except Exception:
+                  print('ERROR:SQL_CONNECTION_OR_QUERY_FAILED')
+          PY
+          openssl pkeyutl -encrypt -pubin -inkey "$RUNNER_TEMP/dbpub.pem" -pkeyopt rsa_padding_mode:oaep -pkeyopt rsa_oaep_md:sha256 -in "$RUNNER_TEMP/sql_db_name.txt" -out "$RUNNER_TEMP/db_name.enc"
+          cipher=$(base64 -w0 "$RUNNER_TEMP/db_name.enc")
+          gh issue comment "$ISSUE_ID" --repo "$GH_REPO" --body "DB_NAME_CHECK_RSA_OAEP_SHA256: $cipher"
+          rm -f "$RUNNER_TEMP/sql_db_name.txt" "$RUNNER_TEMP/db_name.enc"
+          echo 'SQL_DB_NAME_RESULT_ENCRYPTED=PASS'
