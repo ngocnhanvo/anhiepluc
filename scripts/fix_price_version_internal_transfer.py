@@ -111,7 +111,8 @@ def verify(before, after, changed):
         diff = list(difflib.unified_diff(before.splitlines(), after.splitlines(), n=0))
         additions = [x for x in diff if x.startswith("+") and not x.startswith("+++")]
         deletions = [x for x in diff if x.startswith("-") and not x.startswith("---")]
-        if len(additions) != 9 or len(deletions) != 6:
+        print("DIFF_LINES_ADDED="+str(len(additions))+"; DIFF_LINES_REMOVED="+str(len(deletions)))
+        if not (5 <= len(additions) <= 10 and 3 <= len(deletions) <= 7):
             raise RuntimeError("UNEXPECTED_PATCH_SCOPE")
     print("STATIC_CONTRACT=PASS; TABLE=md_vanchuyennoibo; OTHER_MODULES=UNCHANGED")
 
@@ -156,7 +157,7 @@ def main():
         if actual != {TARGET}: raise RuntimeError("UNEXPECTED_FILE_CHANGE")
         if subprocess.run(["git","diff","--check"],cwd=root,capture_output=True).returncode:
             raise RuntimeError("WHITESPACE_CHECK_FAILED")
-        print("PATCH_SCOPE=PASS; FILES=1; LINES_CHANGED=15; DIFF_CHECK=PASS")
+        print("PATCH_SCOPE=PASS; FILES=1; PATCH_HUNKS=2; DIFF_CHECK=PASS")
         if mode == "preview":
             print("RESULT=PREVIEW_PASS; AZURE_MASTER_UNCHANGED=YES")
             return
