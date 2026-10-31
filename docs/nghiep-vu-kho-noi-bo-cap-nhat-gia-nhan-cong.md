@@ -79,6 +79,25 @@ Chứng cứ kiểm tra (kết quả dữ liệu chi tiết được mã hóa, t
 4. Tách xác định **phiên bảng giá gắn header** và **tính giá nhân công / giá chi tiết**: sửa một việc chưa chắc đồng nghĩa đã xử lý việc còn lại.
 5. Chỉ đề xuất UPDATE hoặc sửa code sau khi tìm nguyên nhân cụ thể, có bảo vệ chống cập nhật nhầm và test đối chứng.
 
-## 5. Giới hạn chứng cứ
+## 5. Bản sửa đã merge vào Azure production (2026-10-31)
+
+- Azure PR: **#13**, commit source `1c6fe3ee81d57e89bcc9d5da926c230c68dd55ce`.
+- Azure `master` sau merge: **`bfd12089c05c98acc94288c57462fe3a0330d248`**.
+- Phạm vi: chỉ `eman_ver3/Controller/JQGridModify/JQGridMD_01_PhienBangGiaJQGSModify.ashx`.
+- Khi `type == "2"` (cập nhật theo số chứng từ), nhánh `md_vanchuyennoibo` lọc theo `scts` và `banggiaNC == pbg.md_banggia_id` thay vì lọc cứng theo `phienbangiaNC == id`. Vì vậy chứng từ chưa có phiên có thể được chọn đúng bảng giá.
+- Khi `doiPBGMoiNhat == "1"`, vẫn lấy phiên mới nhất như trước. Nếu không chọn chế độ đó và `type == "2"`, gán `phienbangiaNC` thành `pbg.md_phienbangia_id` tương ứng phiên đã chọn.
+- Chế độ thông thường (`type != "2"`) vẫn lọc theo phiên cũ và ngày tạo trong khoảng 120 ngày. Không thay đổi xử lý `md_xuatkhonb`, `md_nhapkhonb`, các nhánh detail, `SaveChanges` và transaction.
+- Có bảo vệ lọc **cùng bảng giá nhân công** để tránh chọn sai phiên cho chứng từ khác bảng giá.
+
+**Kiểm chứng:**
+
+- [Preview #43](https://github.com/ngocnhanvo/anhiepluc/issues/43): PASS, diff 7 dòng thêm / 4 dòng bỏ, đúng một file, giữ CRLF.
+- [Tạo PR #44](https://github.com/ngocnhanvo/anhiepluc/issues/44): PASS.
+- [Merge #45](https://github.com/ngocnhanvo/anhiepluc/issues/45): Azure PR merge PASS; bước kiểm tra lần đầu lỗi header xác thực của công cụ.
+- [Xác minh lại #46](https://github.com/ngocnhanvo/anhiepluc/issues/46): PASS; đọc lại **Azure master mới** và xác nhận code đã có bản sửa.
+
+**Giới hạn:** Mới xác minh source trên `master`; chưa có bằng chứng kiểm thử thao tác UI hoặc biên dịch toàn website trên IIS. Chưa sửa bất kỳ dữ liệu chứng từ nào trong DB. Người dùng cần thực hiện case với số chứng từ/phiên được chọn để áp dụng cho bản ghi cũ.
+
+## 6. Giới hạn chứng cứ
 
 Code tham chiếu đến bảng là bằng chứng nhánh case có xử lý bảng đó, **không chứng minh mọi phiếu của bảng đều đủ điều kiện cập nhật**. Danh sách bảng và logic sẽ cập nhật theo từng lần đối chiếu source Azure `master`.
