@@ -31,3 +31,7 @@ jobs:
         run: |
           set -euo pipefail
           gh issue comment ${{ github.event.issue.number }} --repo ${{ github.repository }} --body-file "$RUNNER_TEMP/case_inspection.txt"
+      - name: Publish safe code structure
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh issue comment ${{ github.event.issue.number }} --repo ${{ github.repository }} --body-file "$RUNNER_TEMP/case_public_summary.json"
