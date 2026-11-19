@@ -57,5 +57,34 @@ jobs:
                   if found and ('baocao' in str(f).lower() or 'report' in str(f).lower() or 'plan' in str(f).lower()):
                       rel=f.relative_to(root)
                       print('REFERENCE_FILE='+str(rel)+'; MARKERS='+','.join(found)+'; LINES='+','.join(str(n) for n,x in enumerate(v.splitlines(),1) if any(z in x for z in found))[:150])
+              # Specific source-to-layout loading references and report header metadata only
+              backend=root/'eman_ver3/View/Print/MD_00_BaoCaoKeHoach/BaoCaoTHDoanhThuTheoDDH_KH.aspx.cs'
+              lines=backend.read_text(encoding='utf-8-sig',errors='replace').splitlines()
+              for no,line in enumerate(lines[:65],1):
+                  if any(k.lower() in line.lower() for k in ['Report','viewReport','Print','GetData','CreateSql','Bind','Query','Session','DataSet','DataSource','Storage','key','Layout','Load']):
+                      vals=re.findall(r'"([^"]{1,160})"',line)
+                      calls=re.findall(r'([A-Za-z_][\w.]+)\s*\(',line)
+                      print('REPORT_BACKEND_LINE='+str(no)+'; CALLS='+','.join(calls[:6])+'; STRINGS='+','.join(x[:140] for x in vals[:5])+'; IDENTIFIERS='+','.join(re.findall(r'[A-Za-z_][\w.]+',line)[:12]))
+              for f in sorted(root.glob('eman_ver3/ReportsStorage/*')):
+                  if 'doanh thu' in f.name.casefold() or 'doanhthu' in f.name.casefold():
+                      print('REVENUE_TEMPLATE='+str(f.relative_to(root)))
+              layout=root/'eman_ver3/ReportsStorage/[KH-Cancel] Báo Cáo Tổng Hợp Doanh Thu Theo ĐĐH.repx'
+              data=layout.read_text(encoding='utf-8-sig',errors='replace')
+              ls=data.splitlines()
+              import xml.etree.ElementTree as ET
+              try:
+                  tree=ET.fromstring(data)
+                  print('LAYOUT_XML_PARSE=PASS; ROOT='+tree.tag)
+                  for elem in tree.iter():
+                      d=elem.attrib
+                      values=[(k,v) for k,v in d.items() if v.strip() in ('64','81 (CH)','56','58')]
+                      if values:
+                          print('LAYOUT_EXACT_LABEL='+repr(values)+'; ELEMENT='+elem.tag+'; NAME='+str(d.get('Name'))+'; BINDING='+str(d.get('DataBindings'))+'; ATTRIBUTE_KEYS='+','.join(sorted(d.keys())))
+              except Exception as ex:
+                  print('LAYOUT_XML_PARSE=FAIL:'+str(type(ex).__name__))
+              for n,line in enumerate(ls,1):
+                  if re.search(r'81\s*\(\s*CH\s*\)',line,re.I):
+                      print('LAYOUT_CH_LINE='+str(n)+'; LINE_CHARS='+str(len(line))+'; LEFT='+line[:200].replace('<','[').replace('>',']'))
+              print('INSPECTION_EXTENDED_COMPLETE=YES')
               print('INSPECTION_COMPLETE=YES')
           PY
