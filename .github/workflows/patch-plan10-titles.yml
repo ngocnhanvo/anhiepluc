@@ -14,8 +14,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Validate report title patch script
         run: python3 -m py_compile scripts/patch_plan10_titles_56_58.py
-      - name: Preview title-only patch on Azure master
+      - name: Apply verified title-only patch through Azure PR
         env:
           AZURE_DEVOPS_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}
-          REPORT_TITLE_MODE: preview
+          REPORT_TITLE_MODE: apply
         run: python3 scripts/patch_plan10_titles_56_58.py
