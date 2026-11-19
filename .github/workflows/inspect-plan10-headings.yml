@@ -1,0 +1,61 @@
+name: AnHiepLuc - inspect PLAN-10 headings read-only
+on:
+  push:
+    paths:
+      - .github/workflows/inspect-plan10-headings.yml
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Locate report layout and displayed column labels
+        env:
+          AZURE_DEVOPS_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os,base64,pathlib,subprocess,tempfile,re
+          token=os.environ.get('AZURE_DEVOPS_PAT','')
+          if not token: raise RuntimeError('NO_PAT')
+          env=os.environ.copy()
+          env['AZURE_GIT_HEADER']='AUTHORIZATION: Basic '+base64.b64encode((':'+token).encode()).decode()
+          with tempfile.TemporaryDirectory() as d:
+              root=pathlib.Path(d)/'src'
+              p=subprocess.run(['git','--config-env=http.extraheader=AZURE_GIT_HEADER','clone','--depth=1','--branch=master','--quiet','https://dev.azure.com/vongocnhancd10cntt2/AnHiepLuc/_git/AnHiepLuc',str(root)],env=env,stderr=subprocess.PIPE)
+              if p.returncode: raise RuntimeError('AZURE_CLONE_FAILED')
+              sha=subprocess.check_output(['git','-C',str(root),'rev-parse','HEAD'],text=True).strip()
+              print('MASTER_SHA='+sha)
+              files=[f for f in root.rglob('*') if f.is_file() and '.git' not in f.parts]
+              targets=[f for f in files if any(t in f.name.lower() for t in ['baocaothdoanhthutheoddh','baocaothdoanhthu'])]
+              print('REPORT_FILES='+str(len(targets)))
+              for f in targets[:45]:
+                  rel=f.relative_to(root)
+                  print('TARGET='+str(rel)+'; SIZE='+str(f.stat().st_size))
+                  if f.stat().st_size<200000:
+                      raw=f.read_bytes()
+                      for enc in ('utf-8-sig','utf-16','cp1258'):
+                          try: text=raw.decode(enc);break
+                          except UnicodeDecodeError:pass
+                      else:continue
+                      for n,line in enumerate(text.splitlines(),1):
+                          labels=re.findall(r'(?<!\d)(?:81\s*\(\s*CH\s*\)|64|56|58)(?!\d)',line,re.I)
+                          if labels and not re.search(r'ma_sanpham|sl_dathang|substring',line,re.I):
+                              print('TITLE_CANDIDATE='+str(rel)+':'+str(n)+'; labels='+','.join(labels)+'; LINE_CHARS='+str(len(line))+'; nearby_markup='+','.join(re.findall(r'<([A-Za-z][\w:-]+)',line)[:5]))
+              labels=['81 (CH)','81(CH)','81  (CH)','>64<','>81','c81CH','c64','PLAN-10']
+              for f in files:
+                  if f.suffix.lower() not in {'.cs','.aspx','.ascx','.js','.xml','.rdl','.repx','.rdlc','.resx','.razor','.json','.htm','.html','.config','.txt'} or f.stat().st_size>800000:continue
+                  try: s=f.read_bytes()
+                  except OSError:continue
+                  if b'\x00' in s[:120]:continue
+                  v=s.decode('utf-8-sig',errors='replace')
+                  found=[]
+                  for needle in labels:
+                      if needle in v:found.append(needle)
+                  if found and ('baocao' in str(f).lower() or 'report' in str(f).lower() or 'plan' in str(f).lower()):
+                      rel=f.relative_to(root)
+                      print('REFERENCE_FILE='+str(rel)+'; MARKERS='+','.join(found)+'; LINES='+','.join(str(n) for n,x in enumerate(v.splitlines(),1) if any(z in x for z in found))[:150])
+              print('INSPECTION_COMPLETE=YES')
+          PY
