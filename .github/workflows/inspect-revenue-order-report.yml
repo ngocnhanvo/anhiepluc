@@ -72,8 +72,8 @@ jobs:
                       context=lines[max(0,n-13):min(len(lines),n+12)]
                       symbols=[]
                       for s in context:
-                          for match in re.finditer(r'(?i)\\b(?:CA_[A-Za-z0-9_]+|MD_[A-Za-z0-9_]+|BC_[A-Za-z0-9_]+|JQGrid[A-Za-z0-9_]+|public\\s+[A-Za-z0-9_<>,?\\[\\] ]+\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*\\()',s):
-                              symbols.append(match.group(1) if match.lastindex else match.group(0))
+                          for match in re.finditer(r'\b(?:CA_[A-Za-z0-9_]+|MD_[A-Za-z0-9_]+|BC_[A-Za-z0-9_]+|JQGrid[A-Za-z0-9_]+)',s,re.I):
+                              symbols.append(match.group(0))
                       if symbols:
                           print('  NEAR_'+str(n)+'='+','.join(sorted(set(symbols))[:10]))
               print('REPORT_SOURCE_INVENTORY=COMPLETE')
