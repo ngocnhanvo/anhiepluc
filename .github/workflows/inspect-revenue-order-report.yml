@@ -76,5 +76,25 @@ jobs:
                               symbols.append(match.group(0))
                       if symbols:
                           print('  NEAR_'+str(n)+'='+','.join(sorted(set(symbols))[:10]))
+              report_files=[
+                'eman_ver3/View/Print/MD_00_BaoCaoKeHoach/BaoCaoTHDoanhThuTheoDDH_KH.aspx.cs',
+                'eman_ver3/View/Print/MD_00_BaoCaoKeHoach/BaoCaoTHDoanhThuTheoDDH_KH.aspx',
+                'eman_ver3/View/Print/MD_00_BaoCaoKeHoach/BaoCaoCTDoanhThuTheoMHH_KH.aspx.cs',
+                'eman_ver3/View/Print/MD_00_BaoCaoKeHoach/BaoCaoCTDoanhThuTheoMHH_KH.aspx',
+              ]
+              clues=['DataTable','DataSet','SqlCommand','CommandText','GetData','Select','Query','ReportViewer','NPOI','HSSFWorkbook','XSSFWorkbook','Excel','Response','Export','Render','Load','Grid','Connection','SqlDataAdapter','StoredProcedure','DbContext','MD_','CA_','56','58','51','52','53','54','62','64','81','49','99']
+              for target in report_files:
+                  p=base/target
+                  if not p.is_file(): continue
+                  lines=p.read_text(encoding='utf-8-sig',errors='replace').splitlines()
+                  print('TARGET_DETAIL='+target+'; LINE_COUNT='+str(len(lines)))
+                  for no,line in enumerate(lines,1):
+                      methods=re.findall(r'(?i)\b(?:public|private|protected|internal)\s+(?:static\s+)?(?:[\w<>\[\],?]+\s+){1,4}([A-Za-z_][\w]*)\s*\(',line)
+                      tokens=re.findall(r'\b(?:MD|CA|BC|SP|JQGrid)_[A-Za-z0-9_]+\b',line,re.I)
+                      words=[word for word in clues if word.lower() in line.lower()]
+                      if methods or tokens or len(words)>=2:
+                          called=re.findall(r'([A-Za-z_][A-Za-z0-9_]{2,})\s*\(',line)
+                          print('  CODE_LINE='+str(no)+'; DECL='+','.join(methods[:4])+'; TOKENS='+','.join(sorted(set(tokens))[:6])+'; CALLS='+','.join(sorted(set(called))[:8])+'; CLUES='+','.join(words[:15]))
+              print('REPORT_TARGET_INSPECTION=COMPLETE')
               print('REPORT_SOURCE_INVENTORY=COMPLETE')
           PY
