@@ -1,0 +1,21 @@
+name: AnHiepLuc - PLAN10 title update guarded
+on:
+  push:
+    paths:
+      - .github/workflows/patch-plan10-titles.yml
+      - scripts/patch_plan10_titles_56_58.py
+permissions:
+  contents: read
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate report title patch script
+        run: python3 -m py_compile scripts/patch_plan10_titles_56_58.py
+      - name: Preview title-only patch on Azure master
+        env:
+          AZURE_DEVOPS_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}
+          REPORT_TITLE_MODE: preview
+        run: python3 scripts/patch_plan10_titles_56_58.py
