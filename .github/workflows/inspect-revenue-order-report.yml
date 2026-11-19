@@ -1,0 +1,80 @@
+name: AnHiepLuc - locate revenue-by-order report read-only
+on:
+  push:
+    paths:
+      - .github/workflows/inspect-revenue-order-report.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  locate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Inspect Azure master report source (paths and markers only)
+        env:
+          AZURE_DEVOPS_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import base64,os,pathlib,re,subprocess,tempfile,unicodedata
+          token=os.environ.get('AZURE_DEVOPS_PAT')
+          if not token:
+              raise RuntimeError('AZURE_DEVOPS_PAT is not configured')
+          env=os.environ.copy()
+          env['AZURE_GIT_HEADER']='AUTHORIZATION: Basic '+base64.b64encode((':'+token).encode()).decode()
+          url='https://dev.azure.com/vongocnhancd10cntt2/AnHiepLuc/_git/AnHiepLuc'
+          with tempfile.TemporaryDirectory() as td:
+              base=pathlib.Path(td)/'src'
+              p=subprocess.run(['git','--config-env=http.extraheader=AZURE_GIT_HEADER','clone','--depth=1','--branch','master','--quiet',url,str(base)],env=env,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,text=True)
+              if p.returncode:
+                  raise RuntimeError('Azure clone failed; credential and network error suppressed')
+              sha=subprocess.check_output(['git','-C',str(base),'rev-parse','HEAD'],text=True).strip()
+              print('AZURE_MASTER_SHA='+sha)
+              def norm(x):
+                  return ''.join(c for c in unicodedata.normalize('NFKD',x.lower()) if not unicodedata.combining(c))
+              patt=[
+                 ('report_exact','bao cao tong hop doanh thu theo don dat hang'),
+                 ('report_short','tong hop doanh thu'),
+                 ('report_header','doanh thu tung mat hang'),
+                 ('report_code','plan-10'),
+                 ('report_code_alt','plan_10'),
+                 ('title_short','doanh thu theo don dat hang')
+              ]
+              extensions={'.cs','.ashx','.aspx','.ascx','.js','.ts','.sql','.rdlc','.rdl','.xml','.config','.html','.htm','.razor','.vb','.json','.resx'}
+              files=[x for x in base.rglob('*') if x.is_file() and x.suffix.lower() in extensions and '.git' not in x.parts]
+              print('SOURCE_FILES_SCANNED='+str(len(files)))
+              scored=[]
+              for f in files:
+                  try:
+                      if f.stat().st_size>2_500_000:continue
+                      content=f.read_text(encoding='utf-8-sig',errors='replace')
+                  except Exception:continue
+                  lines=content.splitlines()
+                  hits=[]
+                  for no,line in enumerate(lines,1):
+                      low=norm(line)
+                      for tag,needle in patt:
+                          if needle in low:
+                              hits.append((no,tag))
+                  name=norm(str(f.relative_to(base)))
+                  if hits or any(v in name for v in ['doanhthu','doanh_thu','report','baocao','bao_cao']):
+                      rank=len(hits)*10+int('doanhthu' in name or 'doanh_thu' in name)*5
+                      scored.append((rank,str(f.relative_to(base)),hits,lines))
+              scored.sort(key=lambda x:(-x[0],x[1]))
+              print('MATCHED_FILES='+str(sum(bool(x[2]) for x in scored)))
+              print('CANDIDATE_FILES='+str(len(scored)))
+              for rank,path,hits,lines in scored[:100]:
+                  print('FILE='+path+'; RANK='+str(rank)+'; HITS='+','.join(str(n)+':'+tag for n,tag in hits[:16]))
+                  # Names only; do not publish private Azure source code lines
+                  for n,tag in hits[:8]:
+                      context=lines[max(0,n-13):min(len(lines),n+12)]
+                      symbols=[]
+                      for s in context:
+                          for match in re.finditer(r'(?i)\\b(?:CA_[A-Za-z0-9_]+|MD_[A-Za-z0-9_]+|BC_[A-Za-z0-9_]+|JQGrid[A-Za-z0-9_]+|public\\s+[A-Za-z0-9_<>,?\\[\\] ]+\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*\\()',s):
+                              symbols.append(match.group(1) if match.lastindex else match.group(0))
+                      if symbols:
+                          print('  NEAR_'+str(n)+'='+','.join(sorted(set(symbols))[:10]))
+              print('REPORT_SOURCE_INVENTORY=COMPLETE')
+          PY
