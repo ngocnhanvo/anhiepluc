@@ -85,6 +85,26 @@ jobs:
               for n,line in enumerate(ls,1):
                   if re.search(r'81\s*\(\s*CH\s*\)',line,re.I):
                       print('LAYOUT_CH_LINE='+str(n)+'; LINE_CHARS='+str(len(line))+'; LEFT='+line[:200].replace('<','[').replace('>',']'))
+              # Distinguish active report configuration from canceled repository template.
+              for n,line in enumerate(lines[:54],1):
+                  quoted=re.findall(r'"([^"]{1,200})"',line)
+                  if any(w in line for w in ('nameTemp','nameRpt','task','ReportViewer1','ReportStorage','ReportSource','SqlQuery','LoadLayout','XtraReport')):
+                      print('REPORT_WIRING='+str(n)+'; STRINGS='+','.join(quoted)+'; IDENTIFIERS='+','.join(re.findall(r'(?<![\w])[A-Za-z_][A-Za-z0-9_]+(?:\.[A-Za-z_][A-Za-z0-9_]+)*',line)[:15]))
+              markup=root/'eman_ver3/View/Print/MD_00_BaoCaoKeHoach/BaoCaoTHDoanhThuTheoDDH_KH.aspx'
+              for n,line in enumerate(markup.read_text(encoding='utf-8-sig',errors='replace').splitlines(),1):
+                  if any(w in line.lower() for w in ['report','reportviewer','documentviewer']):
+                      print('REPORT_MARKUP='+str(n)+'; STRINGS='+','.join(re.findall(r'"([^"]{1,100})"',line))+'; TAGS='+','.join(re.findall(r'<([A-Za-z0-9:]+)',line)))
+              # Detect reports of same friendly name and the active report API loader.
+              for needle in ('class PrintAnco2','exportDataWithType(','ReportsStorage','new XtraReport('):
+                  matches=[]
+                  for f in files:
+                      if f.suffix.lower() not in {'.cs','.ashx','.aspx'} or f.stat().st_size>200000:continue
+                      try:v=f.read_text(encoding='utf-8-sig',errors='replace')
+                      except Exception:continue
+                      if needle in v:
+                          matches.append(str(f.relative_to(root)))
+                  print('LOADER_REFERENCE='+needle+'; MATCH_COUNT='+str(len(matches))+'; MATCH_FILES='+','.join(matches[:15]))
+              print('INSPECTION_WIRING_COMPLETE=YES')
               print('INSPECTION_EXTENDED_COMPLETE=YES')
               print('INSPECTION_COMPLETE=YES')
           PY
