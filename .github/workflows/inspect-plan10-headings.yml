@@ -104,6 +104,28 @@ jobs:
                       if needle in v:
                           matches.append(str(f.relative_to(root)))
                   print('LOADER_REFERENCE='+needle+'; MATCH_COUNT='+str(len(matches))+'; MATCH_FILES='+','.join(matches[:15]))
+              loader=root/'eman_ver3/App_Code/ClassCalling/PrintAnco2.cs'
+              text=loader.read_text(encoding='utf-8-sig',errors='replace')
+              ll=text.splitlines()
+              function_starts=[n for n,ln in enumerate(ll) if 'exportDataWithType(' in ln]
+              print('EXPORTDATAWITH_TYPE_DEFINITIONS='+','.join(str(n+1) for n in function_starts))
+              for idx in function_starts[:4]:
+                  print('EXPORT_METHOD_START_LINE='+str(idx+1))
+                  for n,ln in enumerate(ll[idx:idx+190],idx+1):
+                      words=['Report','XtraReport','nameTemp','LoadLayout','Load','File','Layout','DataSource','ReportViewer1','viewer','Export','PDF','reportName','CreateDocument','ReadAll','Stream','ReportPrintTool','Source','ReportStorage','FromFile']
+                      if any(x.lower() in ln.lower() for x in words):
+                          literals=re.findall(r'"([^"]{1,120})"',ln)
+                          method_calls=re.findall(r'([A-Za-z_][\w.]*)\s*\(',ln)
+                          toks=re.findall(r'[A-Za-z_][\w.]*',ln)
+                          print('EXPORT_LINE='+str(n)+'; LITERALS='+','.join(literals[:4])+'; CALLS='+','.join(method_calls[:5])+'; IDENTS='+','.join(toks[:15]))
+              active=root/'eman_ver3/ReportsStorage/[KH] Báo Cáo Tổng Hợp Doanh Thu Theo ĐĐH.repx'
+              print('ACTIVE_TEMPLATE_IN_AZURE_REPO='+str(active.is_file()))
+              cancel=root/'eman_ver3/ReportsStorage/[KH-Cancel] Báo Cáo Tổng Hợp Doanh Thu Theo ĐĐH.repx'
+              if cancel.is_file():
+                  txt=cancel.read_text(encoding='utf-8-sig',errors='replace')
+                  for pat in ['this.xrTableCell16.Text = "81 (CH)";','this.xrTableCell16.Text = "64";','this.xrTableCell', 'Text = "64"', 'Text = "81 (CH)"']:
+                      print('CANCELED_TEMPLATE_PATTERN='+pat+'; COUNT='+str(txt.count(pat)))
+              print('INSPECTION_LOADER_COMPLETE=YES')
               print('INSPECTION_WIRING_COMPLETE=YES')
               print('INSPECTION_EXTENDED_COMPLETE=YES')
               print('INSPECTION_COMPLETE=YES')
