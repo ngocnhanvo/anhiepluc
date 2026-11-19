@@ -138,7 +138,7 @@ def main():
         path.write_bytes(normalized.encode(encoding))
         if set(git("diff", "--name-only", cwd=root).splitlines()) != {TARGET}:
             raise RuntimeError("UNEXPECTED_FILE_CHANGED")
-        git("diff", "--check", cwd=root)
+        git("-c", "core.whitespace=cr-at-eol", "diff", "--check", cwd=root)
         stat = git("diff", "--numstat", cwd=root)
         print("DIFF_NUMSTAT="+stat.replace(TARGET,"TARGET_CSHARP"))
         if not stat.startswith("2\t4\t") and not stat.startswith("2\t4\t".replace("\\t", "\t")):
