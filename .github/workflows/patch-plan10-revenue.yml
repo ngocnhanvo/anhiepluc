@@ -14,8 +14,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Validate patch script
         run: python3 -m py_compile scripts/patch_plan10_revenue_data_56_58.py
-      - name: Preview PLAN-10 targeted data-only patch
+      - name: Apply PLAN-10 guarded Azure PR and merge without bypassing policies
         env:
           AZURE_DEVOPS_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}
-          REPORT_PATCH_MODE: preview
+          REPORT_PATCH_MODE: apply
         run: python3 scripts/patch_plan10_revenue_data_56_58.py
