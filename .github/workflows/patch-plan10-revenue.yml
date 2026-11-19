@@ -1,0 +1,21 @@
+name: AnHiepLuc - PLAN10 report revenue systems guarded patch
+on:
+  push:
+    paths:
+      - .github/workflows/patch-plan10-revenue.yml
+      - scripts/patch_plan10_revenue_data_56_58.py
+permissions:
+  contents: read
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate patch script
+        run: python3 -m py_compile scripts/patch_plan10_revenue_data_56_58.py
+      - name: Preview PLAN-10 targeted data-only patch
+        env:
+          AZURE_DEVOPS_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}
+          REPORT_PATCH_MODE: preview
+        run: python3 scripts/patch_plan10_revenue_data_56_58.py
