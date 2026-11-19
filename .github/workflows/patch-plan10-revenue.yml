@@ -1,9 +1,6 @@
 name: AnHiepLuc - PLAN10 report revenue systems guarded patch
 on:
-  push:
-    paths:
-      - .github/workflows/patch-plan10-revenue.yml
-      - scripts/patch_plan10_revenue_data_56_58.py
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:
@@ -14,8 +11,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Validate patch script
         run: python3 -m py_compile scripts/patch_plan10_revenue_data_56_58.py
-      - name: Apply PLAN-10 guarded Azure PR and merge without bypassing policies
+      - name: Verify deployed PLAN-10 mapping (read-only preview)
         env:
           AZURE_DEVOPS_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}
-          REPORT_PATCH_MODE: apply
+          REPORT_PATCH_MODE: preview
         run: python3 scripts/patch_plan10_revenue_data_56_58.py
