@@ -1,0 +1,53 @@
+name: AHL - read-only order-price database schema audit
+on:
+  push:
+    paths:
+      - .github/workflows/audit-order-price-db.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Install SQL driver
+        run: python -m pip install -q 'pymssql>=2.3,<3'
+      - name: Read metadata only; never modify business data
+        shell: bash
+        env:
+          DB_SERVER: ${{ secrets.ANHIEPLUC_SQL_SERVER }}
+          DB_USER: ${{ secrets.ANHIEPLUC_SQL_USER }}
+          DB_PASSWORD: ${{ secrets.ANHIEPLUC_SQL_PASSWORD }}
+          DB_DATABASE: ${{ secrets.ANHIEPLUC_SQL_DATABASE }}
+        run: |
+          python - <<'PY'
+          import os,re,pymssql
+          host=os.environ['DB_SERVER'].removeprefix('tcp:')
+          port=1433
+          if ',' in host:
+            a,b=host.rsplit(',',1)
+            if b.isdigit():host,port=a,int(b)
+          con=pymssql.connect(server=host,port=port,user=os.environ['DB_USER'],password=os.environ['DB_PASSWORD'],database=os.environ['DB_DATABASE'],login_timeout=18,timeout=30,autocommit=False,as_dict=True)
+          try:
+            with con.cursor() as cur:
+              cur.execute('SELECT DB_NAME() AS dbname')
+              dbname=cur.fetchone()['dbname']
+              print('SQL_READONLY=YES; DATABASE_IS_CLONE='+str(bool(re.search(r'31[.]10[.]26|backup|test|copy',dbname,re.I))))
+              cur.execute("""SELECT t.name AS table_name,c.name AS column_name,ty.name AS type_name
+              FROM sys.tables t
+              JOIN sys.columns c ON c.object_id=t.object_id
+              JOIN sys.types ty ON ty.user_type_id=c.user_type_id
+              WHERE t.name LIKE '%donhang%' OR t.name LIKE '%don_hang%' OR t.name LIKE '%banggia%' OR t.name LIKE '%giasanpham%' OR t.name LIKE '%giaban%' OR t.name LIKE '%dongdon%' OR t.name LIKE '%dathang%'
+              ORDER BY t.name,c.column_id""")
+              rows=cur.fetchall()
+              by={}
+              for x in rows:by.setdefault(x['table_name'],[]).append((x['column_name'],x['type_name']))
+              print('MATCHING_TABLES='+str(len(by)))
+              for table, cols in sorted(by.items()):
+                relevant=[a+':'+b for a,b in cols if re.search(r'gia|price|donhang|dongdon|don_hang|soluong|sochungtu|chuyend|ma_sanpham|phienban|hoatdong|md_banggia|dongtien',a,re.I)]
+                print('SCHEMA_TABLE='+table+'; RELEVANT_COLUMNS='+','.join(relevant)[:750])
+              print('SQL_METADATA_AUDIT=COMPLETE')
+            con.rollback()
+          finally:con.close()
+          PY
