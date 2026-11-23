@@ -1,0 +1,86 @@
+name: AHL - read-only order price audit encrypted
+on:
+  push:
+    paths:
+      - .github/workflows/audit-order-price-encrypted.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - run: python3 -m pip install -q 'cryptography>=43,<50'
+      - name: Inspect AHL Azure master and emit encrypted excerpts only
+        shell: bash
+        env:
+          AZURE_DEVOPS_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os,base64,subprocess,tempfile,pathlib,re,zlib,json,hashlib
+          from cryptography.hazmat.primitives import serialization,hashes
+          from cryptography.hazmat.primitives.asymmetric import padding
+          from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+          pub_pem='''-----BEGIN PUBLIC KEY-----
+          MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA0QvHM/1r7ej1LA3dYd3p
+          OnkPH0T/7CbJee9BYiwRa7k31zc/0QAEac9fDzKbQjwkt/LOEK/6ALKpB4QNXCia
+          ZCp7u7uM+78Fvnn6+I6kS8Nw3OyNEDGf0xklqS3Mp0uuINSgdSJd4DzdxwMO22dG
+          2TdnHC4EBi0TFX+nOb6mvlbn2ahLh2ZDASidoLGVU6dGlJUcyh6hXX9qffhmepxX
+          qYaNh10mfoq3POgXWLhSBS0Is94c+vdlyO34GPzdfWI1Uel3i6zxu+HSVffnTkbp
+          gmbirBq4caI6mDHx/mKyJ6mZzMX328XNc5Cyl13vZJCmuJchwkOZlSeO8ITZOvGy
+          KwIDAQAB
+          -----END PUBLIC KEY-----'''
+          pub=serialization.load_pem_public_key(pub_pem.encode())
+          tok=os.environ.get('AZURE_DEVOPS_PAT')
+          if not tok: raise RuntimeError('AZURE_DEVOPS_PAT_MISSING')
+          env=os.environ.copy()
+          env['AZURE_GIT_HEADER']='AUTHORIZATION: Basic '+base64.b64encode((':'+tok).encode()).decode()
+          with tempfile.TemporaryDirectory() as td:
+            root=pathlib.Path(td)/'src'
+            url='https://dev.azure.com/vongocnhancd10cntt2/AnHiepLuc/_git/AnHiepLuc'
+            p=subprocess.run(['git','--config-env=http.extraheader=AZURE_GIT_HEADER','clone','--quiet','--depth=1','--branch','master',url,str(root)],env=env,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,timeout=420)
+            if p.returncode:raise RuntimeError('AZURE_CLONE_FAILED')
+            sha=subprocess.check_output(['git','-C',str(root),'rev-parse','HEAD'],text=True).strip()
+            exts={'.cs','.js','.ashx','.aspx','.sql','.ascx'}
+            patt=re.compile(r'(?:gia.?ahl|gia.?anco|gi[aá][ _]?mua|gi[aá][ _]?b[aá]n|don.?gia|d[oơ]n.?h[aà]ng|dongdonhang|banggia|ancotrading|ti[eế]p.?nh[aậ]n.?d[oơ]n)',re.I)
+            paths=[]
+            count=0
+            for f in root.rglob('*'):
+              if not f.is_file() or f.suffix.lower() not in exts or '.git' in f.parts or f.stat().st_size>900000:continue
+              count+=1
+              path=str(f.relative_to(root))
+              name=path.lower()
+              if any(a in name for a in ('donhang','don_hang','banggia','phienbangia','dongdon','dataapi','api_','dathang','nhanpo')):
+                paths.append((f,path))
+            matches=[]
+            for f,path in paths:
+              raw=f.read_bytes()
+              s=raw.decode('utf-8-sig',errors='replace')
+              lines=s.splitlines()
+              hits=[i for i,v in enumerate(lines) if patt.search(v)]
+              name=path.lower()
+              score=(80 if 'donhang' in name or 'don_hang' in name else 0)+(30 if 'banggia' in name else 0)+(35 if 'controller' in name.lower() else 0)+(30 if 'module_script' in name else 0)+min(len(hits),80)
+              score+=sum(15 for k in ('giaahl','giaanco','giá ahl','giá anco','giá mua anco','giá bán anco') if k in s.lower())
+              if hits or score>=75:matches.append((score,path,lines,hits))
+            matches.sort(key=lambda x:(-x[0],x[1]))
+            report={'branch':'master','sha':sha,'scanned_files':count,'matched_paths':[{'path':path,'score':score,'lines':len(lines),'hits':hits[:35]} for score,path,lines,hits in matches[:170]],'excerpts':{}}
+            for score,path,lines,hits in matches[:34]:
+              take=set()
+              for i in hits[:20]:
+                take.update(range(max(0,i-6),min(len(lines),i+9)))
+              if not hits:take.update(range(min(50,len(lines))))
+              section=['%05d %s'%(i+1,lines[i][:340]) for i in sorted(take)][:185]
+              report['excerpts'][path]='\n'.join(section)[:12000]
+            key=AESGCM.generate_key(bit_length=256);nonce=os.urandom(12)
+            data=zlib.compress(json.dumps(report,ensure_ascii=False,separators=(',',':')).encode(),9)
+            ct=AESGCM(key).encrypt(nonce,data,None)
+            wrapped=pub.encrypt(key,padding.OAEP(mgf=padding.MGF1(algorithm=hashes.SHA256()),algorithm=hashes.SHA256(),label=None))
+            s=base64.b64encode(wrapped+nonce+ct).decode()
+            print('AHL_AUDIT_READONLY=PASS')
+            print('AHL_MASTER_SHA='+sha)
+            print('SCANNED_FILES='+str(count)+' MATCHED_FILES='+str(len(matches))+' REPORT_JSON_CHARS='+str(len(json.dumps(report))))
+            for i in range(0,len(s),3500):print('AUDIT_CHUNK_%04d='%int(i/3500)+s[i:i+3500])
+            print('AHL_AUDIT_COMPLETE=YES')
+          PY
