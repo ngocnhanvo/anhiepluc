@@ -39,5 +39,25 @@ jobs:
               if hits:
                 path=str(f.relative_to(base))
                 print('PRICE_FIELD_FILE='+path+'; HITS='+';'.join(k+':'+','.join(map(str,v[:25])) for k,v in hits.items()))
+            inspect={
+              'eman_ver3/Controller/PublicFunction/API_GuiNhanDonHang.ashx': [218,219,220,221,222,223,224,225,226],
+              'eman_ver3/Controller/JQGridModify/JQGridMD_00_TatCaDonHangModify.ashx': [329,330,331,332,333,334,335,340,344,345,346,347,348,349,350,351,352,353,354],
+              'eman_ver3/Controller/JQGridModify/JQGridMD_01_DDSDHTNJQGSModify.ashx': [118,119,120,121,122,123,124,125,126,127,128,129,130,131,132,133,134,135,136,137,171,172,173,174,222,223,224,225,226,227,228],
+              'eman_ver3/Controller/JQGridModify/JQGridMD_00_DSDHJQGSModify.ashx': [720,721,722,723,724,725,726,727,728,729,730,731,741,742,743,744,745,746,747,748,749]
+            }
+            for rel,nums in inspect.items():
+              f=base/rel
+              if not f.is_file():continue
+              lines=f.read_text(encoding='utf-8-sig',errors='replace').splitlines()
+              print('PRICE_FIELD_TRACE_BEGIN='+rel)
+              for n in nums:
+                if n>len(lines):continue
+                line=lines[n-1]
+                line=re.sub(r'"[^"]*"', '"STR"', line)
+                line=re.sub(r"'[^']*'", "'STR'", line)
+                ids=re.findall(r'[A-Za-z_][A-Za-z0-9_]*',line)
+                ids=[a for a in ids if a.lower() not in ('str','string','var','new','true','false','null','int','decimal','bool','if','else','for','in','from','select','where')]
+                print('TRACE='+str(n)+'; IDS='+','.join(ids[:24])+'; OPS='+','.join(op for op in ('==','!=','<=','>=','=','<','>','??','&&','||') if op in line))
+              print('PRICE_FIELD_TRACE_END='+rel)
             print('AHL_PRICE_FIELD_SCAN=COMPLETE')
           PY
