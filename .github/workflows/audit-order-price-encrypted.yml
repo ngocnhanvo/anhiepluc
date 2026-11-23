@@ -65,6 +65,12 @@ jobs:
               score+=sum(15 for k in ('giaahl','giaanco','giá ahl','giá anco','giá mua anco','giá bán anco') if k in s.lower())
               if hits or score>=75:matches.append((score,path,lines,hits))
             matches.sort(key=lambda x:(-x[0],x[1]))
+            print('PRICE_AUDIT_FILE_INVENTORY_BEGIN')
+            for score,path,lines,hits in matches[:65]:
+              joined='\\n'.join(lines).lower()
+              tokens=[v for v in ('giaahl','gia_ahl','giaanco','gia_anco','giafob','giahopdong','giaban','giamua','donhang','dondathang','banggia','phienbangia','giathanh','giagoc','gia_anco1','giahl','nhan_donhang','hieuluc') if v in joined]
+              print('PRICE_FILE='+path+'; SCORE='+str(score)+'; LINES='+str(len(lines))+'; PRICE_TOKENS='+','.join(tokens))
+            print('PRICE_AUDIT_FILE_INVENTORY_END')
             report={'branch':'master','sha':sha,'scanned_files':count,'matched_paths':[{'path':path,'score':score,'lines':len(lines),'hits':hits[:35]} for score,path,lines,hits in matches[:170]],'excerpts':{}}
             for score,path,lines,hits in matches[:34]:
               take=set()
