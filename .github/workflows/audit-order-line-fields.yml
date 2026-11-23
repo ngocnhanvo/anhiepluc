@@ -1,0 +1,43 @@
+name: AHL - order line price field usage audit
+on:
+  push:
+    paths:
+      - .github/workflows/audit-order-line-fields.yml
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Search private Azure source for known pricing fields, output file paths and non-sensitive statistics
+        env:
+          AZURE_DEVOPS_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os,base64,subprocess,tempfile,pathlib,re
+          env=os.environ.copy();tok=env.get('AZURE_DEVOPS_PAT')
+          if not tok:raise RuntimeError('PAT_MISSING')
+          env['AZURE_GIT_HEADER']='AUTHORIZATION: Basic '+base64.b64encode((':'+tok).encode()).decode()
+          terms=['gianhap','giachuan','giadoichieu','chenhlechgia','giá ahl','giá anco','md_giasanpham_ancotrading','md_banggia_ancotrading','c_dongdsdh','API_GuiNhanDonHang']
+          with tempfile.TemporaryDirectory() as td:
+            base=pathlib.Path(td)/'src'
+            cmd=['git','--config-env=http.extraheader=AZURE_GIT_HEADER','clone','--quiet','--depth=1','--branch','master','https://dev.azure.com/vongocnhancd10cntt2/AnHiepLuc/_git/AnHiepLuc',str(base)]
+            p=subprocess.run(cmd,env=env,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,timeout=420)
+            if p.returncode:raise RuntimeError('AZURE_CLONE_FAILED')
+            for f in base.rglob('*'):
+              if not f.is_file() or f.suffix.lower() not in ('.cs','.ashx','.js','.aspx','.sql','.config','.cshtml') or '.git' in f.parts or f.stat().st_size>1200000:continue
+              lines=f.read_text(encoding='utf-8-sig',errors='replace').splitlines()
+              hits={k:[] for k in terms}
+              for i,line in enumerate(lines,1):
+                lowered=line.casefold()
+                for k in terms:
+                  if k in lowered:hits[k].append(i)
+              hits={k:v for k,v in hits.items() if v}
+              if hits:
+                path=str(f.relative_to(base))
+                print('PRICE_FIELD_FILE='+path+'; HITS='+';'.join(k+':'+','.join(map(str,v[:25])) for k,v in hits.items()))
+            print('AHL_PRICE_FIELD_SCAN=COMPLETE')
+          PY
