@@ -47,6 +47,14 @@ jobs:
               for table, cols in sorted(by.items()):
                 relevant=[a+':'+b for a,b in cols if re.search(r'gia|price|donhang|dongdon|don_hang|soluong|sochungtu|chuyend|ma_sanpham|phienban|hoatdong|md_banggia|dongtien',a,re.I)]
                 print('SCHEMA_TABLE='+table+'; RELEVANT_COLUMNS='+','.join(relevant)[:750])
+              cur.execute("""SELECT t.name AS table_name,c.name AS column_name
+              FROM sys.tables t JOIN sys.columns c ON c.object_id=t.object_id
+              WHERE (c.name LIKE '%gia%' OR c.name LIKE '%price%')
+                AND (t.name LIKE '%don%' OR t.name LIKE '%dathang%' OR t.name LIKE '%chitiet%' OR t.name LIKE '%hanghoa%' OR t.name LIKE '%ancotrading%')
+              ORDER BY t.name,c.column_id""")
+              price_cols=cur.fetchall()
+              for item in price_cols[:110]:
+                print('ORDER_PRICE_COLUMN='+item['table_name']+'.'+item['column_name'])
               print('SQL_METADATA_AUDIT=COMPLETE')
             con.rollback()
           finally:con.close()
