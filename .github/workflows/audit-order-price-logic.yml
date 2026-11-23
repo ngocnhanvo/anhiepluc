@@ -67,17 +67,17 @@ jobs:
               for tag,p in pats.items():
                 hits=[i+1 for i,line in enumerate(lines) if p.search(line)]
                 print('CATEGORY='+tag+'; COUNT='+str(len(hits))+'; LINES='+','.join(map(str,hits[:38])))
-              tbl=set(re.findall(r'\\b(?:md|c|ad)_[A-Za-z0-9_]+\\b',s,re.I))
+              tbl=set(re.findall(r'\b(?:md|c|ad)_[A-Za-z0-9_]+\b',s,re.I))
               print('TABLE_REFERENCES='+','.join(sorted(tbl)[:70]))
               methods=[]
               for i,line in enumerate(lines,1):
-                hit=re.search(r'\\b(?:public|private|protected|internal)\\s+(?:static\\s+)?(?:async\\s+)?[\\w<>\\[\\],?]+\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*\\(',line)
+                hit=re.search(r'\b(?:public|private|protected|internal)\s+(?:static\s+)?(?:async\s+)?[\w<>\[\],?]+\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(',line)
                 if hit: methods.append(str(i)+':'+hit.group(1))
               print('METHODS='+','.join(methods[:90]))
               for i,line in enumerate(lines,1):
                 if not (pats['label_giaahl'].search(line) or pats['label_giaanco'].search(line) or pats['ancoprice_table'].search(line) or pats['price_validation'].search(line)):
                   continue
-                identifiers=set(re.findall(r'\\b[A-Za-z_][A-Za-z0-9_]{2,}\\b',line))
+                identifiers=set(re.findall(r'\b[A-Za-z_][A-Za-z0-9_]{2,}\b',line))
                 tokens=[x for x in sorted(identifiers) if any(v in x.lower() for v in ('gia','price','donhang','banggia','anco','trangthai','hieuluc','soluong','phien','sanpham','get','load','update','insert','select'))]
                 operators=[op for op in ('===','!==','==','!=','<=','>=','<','>','&&','||','=','IS NULL','IsNull') if op in line]
                 print('MATCH_LINE='+str(i)+'; TOKENS='+','.join(tokens[:24])+'; OPS='+','.join(operators[:10]))
